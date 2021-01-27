@@ -9,10 +9,20 @@ import {
   nextDeployedContractAddr,
 } from "./deploy";
 import assert from "assert";
-import WalletConnectProvider from "@walletconnect/web3-provider";
+// import WalletConnectProvider from "@walletconnect/web3-provider";
+import WalletLink from "walletlink";
 import { BigNumber, Contract, constants, providers, utils } from "ethers";
+import Web3 from "web3";
 import readline from "readline";
 import { ERC20__factory } from "../contract-bindings/ethers";
+import "node-localstorage/register.js";
+
+global.WebSocket = require('ws');
+const { JSDOM } = require("jsdom");
+global.window = new JSDOM("<!DOCTYPE html>").window;
+global.document = global.window.document;
+// global.document = new JSDOM("<!DOCTYPE html>").window.document;
+
 
 const INFURA_ID = "de5e2a8780c04964950e73b696d1bfb1";
 
@@ -115,13 +125,16 @@ interface Provider extends providers.Web3Provider {
 }
 
 async function walletConnectProvider(): Promise<Provider> {
-  const walletConnect = new WalletConnectProvider({ infuraId: INFURA_ID });
-  const web3Provider = new providers.Web3Provider(walletConnect);
-  const closeFn = (): Promise<void> => walletConnect.close();
+  const walletLink = new WalletLink({appName: "Deployment"});
+  const walletLinkProvider =
+    walletLink.makeWeb3Provider("https://ropsten.infura.io/v3/" + INFURA_ID, 3);
+  const web3 = new Web3( walletLinkProvider);
+  const web3Provider = new providers.Web3Provider(web3 as any);
+
+  const closeFn = (): Promise<void> => Promise.resolve(walletLink.disconnect());
   const provider: Provider = Object.assign(web3Provider, { close: closeFn });
 
   console.log("Connecting to the wallet with WalletConnect");
-  await walletConnect.enable();
   const networkName = (await provider.getNetwork()).name;
   const address = await provider.getSigner().getAddress();
   console.log("Connected to", networkName, "using account", address);
