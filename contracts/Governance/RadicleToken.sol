@@ -311,6 +311,37 @@ contract RadicleToken {
     }
 
     /**
+     * @notice Approves spender to spend on behalf of owner.
+     * @param owner The signer of the permit
+     * @param spender The address to approve
+     * @param deadline The time at which the signature expires
+     * @param v The recovery byte of the signature
+     * @param r Half of the ECDSA signature pair
+     * @param s Half of the ECDSA signature pair
+     */
+    function permit(
+        address owner,
+        address spender,
+        uint256 value,
+        uint256 deadline,
+        uint8 v,
+        bytes32 r,
+        bytes32 s
+    ) public {
+        uint256 nonce = nonces[owner]++;
+        bytes32 domainSeparator =
+            keccak256(
+                abi.encode(DOMAIN_TYPEHASH, keccak256(bytes(NAME)), getChainId(), address(this))
+            );
+        bytes32 structHash = keccak256(abi.encode(PERMIT_TYPEHASH, owner, spender, value, nonce, deadline));
+        bytes32 digest = keccak256(abi.encodePacked("\x19\x01", domainSeparator, structHash));
+        address signatory = ecrecover(digest, v, r, s);
+        require(signatory != address(0), "RadicleToken::permit: invalid signature");
+        require(block.timestamp <= deadline, "RadicleToken::permit: signature expired");
+        return _approve(owner, spender, value);
+    }
+
+    /**
      * @notice Gets the current votes balance for `account`
      * @param account The address to get votes balance
      * @return The number of current votes for `account`
