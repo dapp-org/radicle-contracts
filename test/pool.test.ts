@@ -25,7 +25,8 @@ const CYCLE_BLOCKS = 10;
 // but the next call will be executed on the last block of the current cycle.
 async function mineBlocksUntilCycleEnd(): Promise<void> {
   const blockNumber = await ethers.provider.getBlockNumber();
-  await mineBlocks(CYCLE_BLOCKS - ((blockNumber + 1) % CYCLE_BLOCKS));
+  const block = await ethers.provider.getBlock(blockNumber);
+  await mineBlocks(CYCLE_BLOCKS - ((block.timestamp + 1) % CYCLE_BLOCKS));
 }
 
 type AnyPool = EthPool | Erc20Pool;

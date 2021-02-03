@@ -162,7 +162,7 @@ abstract contract Pool {
         Receiver storage receiver = receivers[msg.sender];
         uint64 collectedCycle = receiver.nextCollectedCycle;
         if (collectedCycle == 0) return 0;
-        uint64 currFinishedCycle = uint64(block.number) / cycleBlocks;
+        uint64 currFinishedCycle = uint64(block.timestamp) / cycleBlocks;
         if (collectedCycle > currFinishedCycle) return 0;
         int128 collected = 0;
         int128 lastFundsPerCycle = receiver.lastFundsPerCycle;
@@ -180,7 +180,7 @@ abstract contract Pool {
         Receiver storage receiver = receivers[msg.sender];
         uint64 collectedCycle = receiver.nextCollectedCycle;
         if (collectedCycle == 0) return;
-        uint64 currFinishedCycle = uint64(block.number) / cycleBlocks;
+        uint64 currFinishedCycle = uint64(block.timestamp) / cycleBlocks;
         if (collectedCycle > currFinishedCycle) return;
         int128 collected = 0;
         int128 lastFundsPerCycle = receiver.lastFundsPerCycle;
@@ -254,7 +254,7 @@ abstract contract Pool {
             return sender.startBalance;
         }
         uint128 amtPerBlock = sender.amtPerBlock - (sender.amtPerBlock % sender.weightSum);
-        uint192 alreadySent = (uint64(block.number) - sender.startBlock) * amtPerBlock;
+        uint192 alreadySent = (uint64(block.timestamp) - sender.startBlock) * amtPerBlock;
         if (alreadySent > sender.startBalance) {
             return sender.startBalance % amtPerBlock;
         }
@@ -402,7 +402,10 @@ abstract contract Pool {
             weightSum += weight;
             // Initialize the receiver
             if (weight != 0 && oldWeight == 0 && receivers[receiverAddr].nextCollectedCycle == 0) {
-                receivers[receiverAddr].nextCollectedCycle = uint64(block.number) / cycleBlocks + 1;
+                receivers[receiverAddr].nextCollectedCycle =
+                    uint64(block.timestamp) /
+                    cycleBlocks +
+                    1;
             }
         }
         require(weightSum == PROXY_WEIGHTS_SUM, "Proxy doesn't have the constant weight sum");
@@ -448,7 +451,7 @@ abstract contract Pool {
 
     /// @notice Stops the sender's payments on the current block
     function stopPayments() internal {
-        uint64 blockNumber = uint64(block.number);
+        uint64 blockNumber = uint64(block.timestamp);
         Sender storage sender = senders[msg.sender];
         // Hasn't been sending anything
         if (sender.weightSum == 0 || sender.amtPerBlock < sender.weightSum) return;
@@ -468,7 +471,7 @@ abstract contract Pool {
 
     /// @notice Starts the sender's payments from the current block
     function startPayments() internal {
-        uint64 blockNumber = uint64(block.number);
+        uint64 blockNumber = uint64(block.timestamp);
         Sender storage sender = senders[msg.sender];
         // Won't be sending anything
         if (sender.weightSum == 0 || sender.amtPerBlock < sender.weightSum) return;
@@ -522,7 +525,7 @@ abstract contract Pool {
         int128 perBlockDelta,
         uint64 blockEnd
     ) internal {
-        uint64 blockNumber = uint64(block.number);
+        uint64 blockNumber = uint64(block.timestamp);
         int128 perBlockPerProxyWeightDelta = perBlockDelta / PROXY_WEIGHTS_SUM;
         Proxy storage proxy = proxies[proxyAddr];
         updateSingleProxyDelta(proxy.amtPerWeightDeltas, blockNumber, perBlockPerProxyWeightDelta);
@@ -569,7 +572,7 @@ abstract contract Pool {
         int128 perBlockDelta,
         uint64 blockEnd
     ) internal {
-        uint64 blockNumber = uint64(block.number);
+        uint64 blockNumber = uint64(block.timestamp);
         Receiver storage receiver = receivers[receiverAddr];
         // The receiver was never used, initialize it.
         // The first usage of a receiver is always setting a positive delta to start sending.
@@ -615,7 +618,7 @@ abstract contract Pool {
     /// @param multiplier The multiplier of the deltas applied on the receivers.
     /// `-1` to remove the effects of the proxy, `1` to reapply after removal.
     function applyProxyDeltasOnReceivers(int8 multiplier) internal {
-        uint64 blockNumber = uint64(block.number);
+        uint64 blockNumber = uint64(block.timestamp);
         Proxy storage proxy = proxies[msg.sender];
         uint32 receiversCount = 0;
         // Create an in-memory copy of the receivers list to reduce storage access
