@@ -96,7 +96,7 @@ async function poolConstants(pool: AnyPool): Promise<PoolConstants> {
     proxyWeightsSum: await pool.PROXY_WEIGHTS_SUM(),
     proxyWeightsCountMax: await pool.PROXY_WEIGHTS_COUNT_MAX(),
     withdrawAll: await pool.WITHDRAW_ALL(),
-    amountPerBlockUnchanged: await pool.AMOUNT_PER_BLOCK_UNCHANGED(),
+    amountPerBlockUnchanged: await pool.AMT_PER_SEC_UNCHANGED(),
   };
 }
 
@@ -226,7 +226,7 @@ abstract class PoolUser<Pool extends AnyPool> {
   }
 
   async getAmountPerBlock(): Promise<number> {
-    return (await this.pool.getAmountPerBlock()).toNumber();
+    return (await this.pool.getAmtPerSec()).toNumber();
   }
 
   async setReceivers(receivers: ReceiverWeights, proxies: ReceiverWeights): Promise<void> {
