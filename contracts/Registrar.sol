@@ -26,7 +26,7 @@ contract Registrar {
     uint256 public constant tokenId = uint256(keccak256("radicle"));
 
     /// Registration fee in *Radicle* (uRads).
-    uint256 public registrationFeeRad = 1e18;
+    uint256 public registrationFee = 1e18;
 
     // --- LOGS ---
 
@@ -74,18 +74,18 @@ contract Registrar {
     // --- USER FACING METHODS ---
 
     /// Register a subdomain (with the default resolver and ttl)
-    function registerRad(string memory name, address owner) public {
-        registerRad(name, owner, ens.resolver(radNode), 0);
+    function register(string memory name, address owner) public {
+        register(name, owner, ens.resolver(radNode), 0);
     }
 
     /// Register a subdomain (with a custom resolver and ttl)
-    function registerRad(string memory name, address owner, address resolver, uint64 ttl) public {
-        uint256 fee   = registrationFeeRad;
+    function register(string memory name, address owner, address resolver, uint64 ttl) public {
+        uint256 fee   = registrationFee;
         bytes32 label = keccak256(bytes(name));
 
-        require(rad.balanceOf(msg.sender) >= fee, "Registrar::registerRad: insufficient rad balance");
-        require(available(name), "Registrar::registerRad: name has already been registered");
-        require(valid(name), "Registrar::registerRad: invalid name");
+        require(rad.balanceOf(msg.sender) >= fee, "Registrar::register: insufficient rad balance");
+        require(available(name), "Registrar::register: name has already been registered");
+        require(valid(name), "Registrar::register: invalid name");
 
         rad.burnFrom(msg.sender, fee);
         ens.setSubnodeRecord(radNode, label, owner, resolver, ttl);
@@ -137,7 +137,7 @@ contract Registrar {
 
     /// Set a new registration fee
     function setRegistrationFee(uint256 amt) public adminOnly {
-        registrationFeeRad = amt;
+        registrationFee = amt;
         emit RegistrationFeeChanged(amt);
     }
 
