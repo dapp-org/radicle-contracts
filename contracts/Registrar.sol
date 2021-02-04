@@ -46,6 +46,9 @@ contract Registrar {
     /// The commitment storage contract
     Commitments public immutable commitments = new Commitments();
 
+    /// The commitment storage contract
+    Commitments public immutable commitments = new Commitments();
+
     /// The namehash of the `eth` TLD in the ENS registry, eg. namehash("eth").
     bytes32 public constant ethNode = keccak256(abi.encodePacked(bytes32(0), keccak256("eth")));
 
@@ -58,8 +61,11 @@ contract Registrar {
     /// The minimum number of blocks that must have passed between a commitment and name registration
     uint256 public minCommitmentAge;
 
+    /// The maximum time between commiting to a name and registering the name
+    uint256 public commitmentTimeout = 1 days;
+
     /// Registration fee in *Radicle* (uRads).
-    uint256 public registrationFee = 1e18;
+    uint256 public fee = 1e18;
 
     /// @notice The EIP-712 typehash for the contract's domain
     bytes32 public constant DOMAIN_TYPEHASH =
@@ -220,7 +226,13 @@ contract Registrar {
         emit DomainOwnershipChanged(newOwner);
     }
 
-    /// Set a new resolver for radicle.eth
+    /// Set the commitment timeout
+    function setCommitmentTimeout(uint256 amt) public adminOnly {
+        commitmentTimeout = amt;
+        emit CommitmentTimeoutChanged(amt);
+    }
+
+    /// Set a new resolver for radicle.eth.
     function setDomainResolver(address resolver) public adminOnly {
         ens.setResolver(radNode, resolver);
         emit ResolverChanged(resolver);
