@@ -13,11 +13,14 @@ contract Registrar {
     /// The Radicle ERC20 token.
     ERC20Burnable public immutable rad;
 
+    /// The namehash of the `eth` TLD in the ENS registry, eg. namehash("eth").
+    bytes32 public constant ethNode = keccak256(abi.encodePacked(bytes32(0), keccak256("eth")));
+
     /// The namehash of the node in the `eth` TLD, eg. namehash("radicle.eth").
-    bytes32 public immutable domain;
+    bytes32 public constant radNode = keccak256(abi.encodePacked(ethNode, keccak256("radicle")));
 
     /// The token ID for the node in the `eth` TLD, eg. sha256("radicle").
-    uint256 public immutable tokenId;
+    uint256 public constant tokenId = uint256(keccak256("radicle"));
 
     /// Registration fee in *Radicle* (uRads).
     uint256 public registrationFeeRad = 1e18;
@@ -36,15 +39,11 @@ contract Registrar {
 
     constructor(
         ENS _ens,
-        bytes32 ethDomainNameHash,
-        uint256 ethDomainTokenId,
         ERC20Burnable _rad,
         address adminAddress
     ) {
         ens = _ens;
         rad = _rad;
-        domain = ethDomainNameHash;
-        tokenId = ethDomainTokenId;
         admin = adminAddress;
     }
 
@@ -58,7 +57,7 @@ contract Registrar {
         require(valid(name), "Registrar::registerRad: invalid name");
 
         rad.burnFrom(msg.sender, fee);
-        ens.setSubnodeOwner(domain, label, owner);
+        ens.setSubnodeOwner(radNode, label, owner);
 
         emit NameRegistered(label, owner);
     }
@@ -72,8 +71,7 @@ contract Registrar {
     /// Check whether a name is available for registration.
     function available(string memory name) public view returns (bool) {
         bytes32 label = keccak256(bytes(name));
-        bytes32 node = namehash(domain, label);
-
+        bytes32 node = namehash(radNode, label);
         return !ens.recordExists(node);
     }
 
@@ -86,14 +84,12 @@ contract Registrar {
 
     /// Set the owner of the domain.
     function setDomainOwner(address newOwner) public adminOnly {
-        // The name hash of 'eth'
-        bytes32 ethNode = 0x93cdeb708b7545dc668eb9280176169d1c33cfd8ed6f04690a0bcc88a93fc4ae;
         address ethRegistrarAddr = ens.owner(ethNode);
         require(
             ethRegistrarAddr != address(0),
             "Registrar::setDomainOwner: no registrar found on ENS for the 'eth' domain"
         );
-        ens.setRecord(domain, newOwner, newOwner, 0);
+        ens.setRecord(radNode, newOwner, newOwner, 0);
         IERC721 ethRegistrar = IERC721(ethRegistrarAddr);
         ethRegistrar.transferFrom(address(this), newOwner, tokenId);
     }
