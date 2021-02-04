@@ -1,14 +1,14 @@
 {
     "dapptools": {
-        "branch": "allow-no-libs",
+        "branch": "master",
         "description": "Dapp, Seth, Hevm, and more",
         "homepage": "https://dapp.tools",
         "owner": "dapphub",
         "repo": "dapptools",
-        "rev": "3a8348f6a913241a20bfd911991c3eb74b96ff68",
-        "sha256": "072h9bi3g2z4fzv7wiwcp20068zk3gv0ahfc4945hbcz00knwfpp",
+        "rev": "ce64ec3297bb872f0d4d4792c99f02f854d5161e",
+        "sha256": "1m07dprdm383d4r7ml11ii93lbrm39ywm2vfhzmfdc2gj6w5ah37",
         "type": "tarball",
-        "url": "https://github.com/dapphub/dapptools/archive/3a8348f6a913241a20bfd911991c3eb74b96ff68.tar.gz",
+        "url": "https://github.com/dapphub/dapptools/archive/ce64ec3297bb872f0d4d4792c99f02f854d5161e.tar.gz",
         "url_template": "https://github.com/<owner>/<repo>/archive/<rev>.tar.gz"
     }
 }
