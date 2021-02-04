@@ -7,6 +7,9 @@ import "@openzeppelin/contracts/token/ERC20/ERC20Burnable.sol";
 import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 
 contract Registrar {
+
+    // --- DATA ---
+
     /// The ENS registry.
     ENS public immutable ens;
 
@@ -25,8 +28,7 @@ contract Registrar {
     /// Registration fee in *Radicle* (uRads).
     uint256 public registrationFeeRad = 1e18;
 
-    /// The contract admin who can set fees.
-    address public admin;
+    // --- LOGS ---
 
     /// @notice A name was registered.
     event NameRegistered(string indexed name, bytes32 indexed label, address indexed owner);
@@ -34,17 +36,30 @@ contract Registrar {
     /// @notice The contract admin was changed
     event AdminChanged(address newAdmin);
 
+    /// @notice The registration fee was changed
+    event RegistrationFeeChanged(uint amt);
+
     /// @notice The ownership of the domain was changed
     event DomainOwnershipChanged(address newOwner);
 
     /// @notice The registration fee was changed
-    event RegistrationFeeChanged(uint amt);
+    event ResolverChanged(address resolver);
+
+    /// @notice The registration fee was changed
+    event TTLChanged(uint64 amt);
+
+    // --- AUTH ---
+
+    /// The contract admin who can set fees.
+    address public admin;
 
     /// Protects admin-only functions.
     modifier adminOnly {
         require(msg.sender == admin, "Registrar: only the admin can perform this action");
         _;
     }
+
+    // --- INIT ---
 
     constructor(
         ENS _ens,
@@ -56,7 +71,7 @@ contract Registrar {
         admin = _admin;
     }
 
-    // --- PUBLIC METHODS ---
+    // --- USER FACING METHODS ---
 
     /// Register a subdomain using radicle tokens.
     function registerRad(string memory name, address owner) public {
@@ -101,6 +116,18 @@ contract Registrar {
         ethRegistrar.transferFrom(address(this), newOwner, tokenId);
 
         emit DomainOwnershipChanged(newOwner);
+    }
+
+    /// Set a new resolver for radicle.eth
+    function setDomainResolver(address resolver) public adminOnly {
+        ens.setResolver(radNode, resolver);
+        emit ResolverChanged(resolver);
+    }
+
+    /// Set a new ttl for radicle.eth
+    function setDomainTTL(uint64 ttl) public adminOnly {
+        ens.setTTL(radNode, ttl);
+        emit TTLChanged(ttl);
     }
 
     /// Set a new registration fee
