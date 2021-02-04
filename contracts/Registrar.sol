@@ -220,7 +220,7 @@ contract Registrar {
         emit DomainOwnershipChanged(newOwner);
     }
 
-    /// Set a new resolver for radicle.eth.
+    /// Set a new resolver for radicle.eth
     function setDomainResolver(address resolver) public adminOnly {
         ens.setResolver(radNode, resolver);
         emit ResolverChanged(resolver);
