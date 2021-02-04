@@ -338,7 +338,7 @@ contract RadicleToken {
         address signatory = ecrecover(digest, v, r, s);
         require(signatory != address(0), "RadicleToken::permit: invalid signature");
         require(block.timestamp <= deadline, "RadicleToken::permit: signature expired");
-        return _approve(owner, spender, value);
+        _approve(owner, spender, value);
     }
 
     /**
