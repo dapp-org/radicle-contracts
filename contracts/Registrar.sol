@@ -29,7 +29,13 @@ contract Registrar {
     address public admin;
 
     /// @notice A name was registered.
-    event NameRegistered(bytes32 indexed label, address indexed owner);
+    event NameRegistered(string indexed name, bytes32 indexed label, address indexed owner);
+
+    /// @notice The contract admin was changed
+    event AdminChanged(address newAdmin);
+
+    /// @notice The ownership of the domain was changed
+    event DomainOwnershipChanged(address newOwner);
 
     /// Protects admin-only functions.
     modifier adminOnly {
@@ -59,7 +65,7 @@ contract Registrar {
         rad.burnFrom(msg.sender, fee);
         ens.setSubnodeOwner(radNode, label, owner);
 
-        emit NameRegistered(label, owner);
+        emit NameRegistered(name, label, owner);
     }
 
     /// Check whether a name is valid.
@@ -92,10 +98,12 @@ contract Registrar {
         ens.setRecord(radNode, newOwner, newOwner, 0);
         IERC721 ethRegistrar = IERC721(ethRegistrarAddr);
         ethRegistrar.transferFrom(address(this), newOwner, tokenId);
+        emit DomainOwnershipChanged(newOwner);
     }
 
     /// Set a new admin
     function setAdmin(address _admin) public adminOnly {
         admin = _admin;
+        emit AdminChanged(_admin);
     }
 }
