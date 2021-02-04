@@ -78,7 +78,7 @@ contract Registrar {
     function available(string memory name) public view returns (bool) {
         bytes32 label = keccak256(bytes(name));
         bytes32 node = namehash(radNode, label);
-        return !ens.recordExists(node);
+        return ens.owner(node) == address(0);
     }
 
     /// Get the "namehash" of a label.
