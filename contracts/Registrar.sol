@@ -73,8 +73,13 @@ contract Registrar {
 
     // --- USER FACING METHODS ---
 
-    /// Register a subdomain using radicle tokens.
+    /// Register a subdomain (with the default resolver and ttl)
     function registerRad(string memory name, address owner) public {
+        registerRad(name, owner, ens.resolver(radNode), 0);
+    }
+
+    /// Register a subdomain (with a custom resolver and ttl)
+    function registerRad(string memory name, address owner, address resolver, uint64 ttl) public {
         uint256 fee   = registrationFeeRad;
         bytes32 label = keccak256(bytes(name));
 
@@ -83,7 +88,7 @@ contract Registrar {
         require(valid(name), "Registrar::registerRad: invalid name");
 
         rad.burnFrom(msg.sender, fee);
-        ens.setSubnodeOwner(radNode, label, owner);
+        ens.setSubnodeRecord(radNode, label, owner, resolver, ttl);
 
         emit NameRegistered(name, label, owner);
     }
