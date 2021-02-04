@@ -48,9 +48,9 @@ contract VestingTokenTests is DSTest, DSMath {
         owner = new VestingOwner();
     }
 
-    // Demonstrates a bug where withdrawableBalance() always reverts after
+    // Demonstrates a bug where withdrawableBalance() could revert after
     // vesting has been interrupted.
-    function testFail_vesting_failure() public {
+    function test_vesting_failure() public {
         VestingToken vest = Utils.mkVestingToken(
             address(rad),
             address(this),
