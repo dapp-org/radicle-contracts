@@ -46,11 +46,11 @@ contract Registrar {
     constructor(
         ENS _ens,
         ERC20Burnable _rad,
-        address adminAddress
+        address _admin
     ) {
         ens = _ens;
         rad = _rad;
-        admin = adminAddress;
+        admin = _admin;
     }
 
     // --- PUBLIC METHODS ---
