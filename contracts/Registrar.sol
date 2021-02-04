@@ -94,7 +94,7 @@ contract Registrar {
     function setDomainOwner(address newOwner) public adminOnly {
         IERC721 ethRegistrar = IERC721(ens.owner(ethNode));
 
-        ens.setRecord(radNode, newOwner, newOwner, 0);
+        ens.setOwner(radNode, newOwner);
         ethRegistrar.transferFrom(address(this), newOwner, tokenId);
 
         emit DomainOwnershipChanged(newOwner);
