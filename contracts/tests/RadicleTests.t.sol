@@ -352,7 +352,7 @@ contract RegistrarRPCTests is DSTest {
 contract RadUser {
     RadicleToken rad;
     Governor   gov;
-    constructor (RadicleToken rad_, Governor gov_) public {
+    constructor (RadicleToken rad_, Governor gov_) {
         rad = rad_;
         gov = gov_;
     }
