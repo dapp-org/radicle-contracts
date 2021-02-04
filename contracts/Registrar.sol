@@ -37,6 +37,9 @@ contract Registrar {
     /// @notice The ownership of the domain was changed
     event DomainOwnershipChanged(address newOwner);
 
+    /// @notice The registration fee was changed
+    event RegistrationFeeChanged(uint amt);
+
     /// Protects admin-only functions.
     modifier adminOnly {
         require(msg.sender == admin, "Registrar: only the admin can perform this action");
@@ -98,6 +101,12 @@ contract Registrar {
         ethRegistrar.transferFrom(address(this), newOwner, tokenId);
 
         emit DomainOwnershipChanged(newOwner);
+    }
+
+    /// Set a new registration fee
+    function setRegistrationFee(uint256 amt) public adminOnly {
+        registrationFeeRad = amt;
+        emit RegistrationFeeChanged(amt);
     }
 
     /// Set a new admin
