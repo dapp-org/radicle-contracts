@@ -92,14 +92,11 @@ contract Registrar {
 
     /// Set the owner of the domain.
     function setDomainOwner(address newOwner) public adminOnly {
-        address ethRegistrarAddr = ens.owner(ethNode);
-        require(
-            ethRegistrarAddr != address(0),
-            "Registrar::setDomainOwner: no registrar found on ENS for the 'eth' domain"
-        );
+        IERC721 ethRegistrar = IERC721(ens.owner(ethNode));
+
         ens.setRecord(radNode, newOwner, newOwner, 0);
-        IERC721 ethRegistrar = IERC721(ethRegistrarAddr);
         ethRegistrar.transferFrom(address(this), newOwner, tokenId);
+
         emit DomainOwnershipChanged(newOwner);
     }
 
