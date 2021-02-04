@@ -39,7 +39,7 @@ contract Registrar {
 
     /// Protects admin-only functions.
     modifier adminOnly {
-        require(msg.sender == admin, "Only the admin can perform this action");
+        require(msg.sender == admin, "Registrar: only the admin can perform this action");
         _;
     }
 
@@ -52,6 +52,8 @@ contract Registrar {
         rad = _rad;
         admin = adminAddress;
     }
+
+    // --- PUBLIC METHODS ---
 
     /// Register a subdomain using radicle tokens.
     function registerRad(string memory name, address owner) public {
@@ -86,7 +88,7 @@ contract Registrar {
         return keccak256(abi.encodePacked(parent, label));
     }
 
-    // ADMIN FUNCTIONS
+    // --- ADMIN METHODS ---
 
     /// Set the owner of the domain.
     function setDomainOwner(address newOwner) public adminOnly {
@@ -102,8 +104,8 @@ contract Registrar {
     }
 
     /// Set a new admin
-    function setAdmin(address _admin) public adminOnly {
-        admin = _admin;
-        emit AdminChanged(_admin);
+    function setAdmin(address newAdmin) public adminOnly {
+        admin = newAdmin;
+        emit AdminChanged(newAdmin);
     }
 }
