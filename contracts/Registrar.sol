@@ -13,7 +13,8 @@ contract Commitments {
     modifier auth { require(msg.sender == owner, "Commitments: unauthorized"); _; }
     event SetOwner(address usr);
 
-    mapping(bytes32 => uint) public expires;
+    /// Mapping from the commitment to the block number in which the commitment was made
+    mapping(bytes32 => uint) public commited;
 
     constructor() {
         owner = msg.sender;
@@ -24,8 +25,8 @@ contract Commitments {
         emit SetOwner(usr);
     }
 
-    function commit(bytes32 commitment, uint deadline) external auth {
-        expires[commitment] = deadline;
+    function commit(bytes32 commitment) external auth {
+        commited[commitment] = block.number;
     }
 
     function mkCommitment(
@@ -57,8 +58,9 @@ contract Registrar {
     /// The token ID for the node in the `eth` TLD, eg. sha256("radicle").
     uint256 public constant tokenId = uint256(keccak256("radicle"));
 
-    /// The maximum time between commiting to a name and registering the name
-    uint256 public commitmentTimeout = 1 days;
+    /// The minimum number of blocks that must have passed between a commitment and name registration
+    // TODO: justify this as a default value...
+    uint256 public minCommitmentAge = 50;
 
     /// Registration fee in *Radicle* (uRads).
     uint256 public fee = 1e18;
@@ -69,7 +71,7 @@ contract Registrar {
     event NameRegistered(string indexed name, bytes32 indexed label, address indexed owner);
 
     /// @notice A commitment was made
-    event CommitmentMade(bytes32 commitment, uint deadline);
+    event CommitmentMade(bytes32 commitment, uint blockNumber);
 
     /// @notice The contract admin was changed
     event AdminChanged(address newAdmin);
@@ -89,8 +91,8 @@ contract Registrar {
     /// @notice The ens registry was updated
     event EnsChanged(address ens);
 
-    /// @notice The commitment timeout was changed
-    event CommitmentTimeoutChanged(uint256 amt);
+    /// @notice The minimum age for a commitment was changed
+    event MinCommitmentAgeChanged(uint256 amt);
 
     // -- MATH --
 
@@ -125,13 +127,13 @@ contract Registrar {
 
     /// Commit to a future name registration
     function commit(bytes32 commitment) external {
-        uint deadline = add(block.timestamp, commitmentTimeout);
-        require(commitments.expires(commitment) == 0, "Registrar::commit: already commited");
+        require(commitments.commited(commitment) == 0, "Registrar::commit: already commited");
+        require(rad.balanceOf(msg.sender) >= fee, "Registrar::register: insufficient rad balance");
 
         rad.burnFrom(msg.sender, fee);
-        commitments.commit(commitment, deadline);
+        commitments.commit(commitment);
 
-        emit CommitmentMade(commitment, deadline);
+        emit CommitmentMade(commitment, block.number);
     }
 
     /// Register a subdomain (with the default resolver and ttl)
@@ -145,13 +147,12 @@ contract Registrar {
     ) public {
         bytes32 label = keccak256(bytes(name));
         bytes32 commitment = commitments.mkCommitment(name, owner, salt);
-        uint256 expiry = commitments.expires(commitment);
+        uint256 commited = commitments.commited(commitment);
 
-        require(expiry != 0, "Registrar::register: must commit before registration");
-        require(expiry > block.timestamp, "Registrar::register: commitment expired");
-        require(rad.balanceOf(msg.sender) >= fee, "Registrar::register: insufficient rad balance");
-        require(available(name), "Registrar::register: name has already been registered");
         require(valid(name), "Registrar::register: invalid name");
+        require(available(name), "Registrar::register: name has already been registered");
+        require(commited != 0, "Registrar::register: must commit before registration");
+        require(commited + minCommitmentAge > block.number, "Registrar::register: commitment too young");
 
         ens.setSubnodeRecord(radNode, label, owner, resolver, ttl);
 
@@ -190,9 +191,9 @@ contract Registrar {
     }
 
     /// Set the commitment timeout
-    function setCommitmentTimeout(uint256 amt) public adminOnly {
-        commitmentTimeout = amt;
-        emit CommitmentTimeoutChanged(amt);
+    function setMinCommitmentAge(uint256 amt) public adminOnly {
+        minCommitmentAge = amt;
+        emit MinCommitmentAgeChanged(amt);
     }
 
     /// Set a new resolver for radicle.eth.
