@@ -180,12 +180,7 @@ contract Registrar {
     function commitWithPermit(bytes32 commitment, address owner, address spender, uint256 value,
                               uint256 deadline, uint8 v, bytes32 r, bytes32 s) external {
         rad.permit(owner, spender, value, deadline, v, r, s);
-
-        rad.burnFrom(msg.sender, fee);
-        commitments.commit(commitment);
-
-        emit CommitmentMade(commitment, block.number);
-
+        commit(commitment);
     }
 
     /// Register a subdomain
