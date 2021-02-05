@@ -130,15 +130,8 @@ contract Registrar {
         emit CommitmentMade(commitment, block.number);
     }
 
-    /// Register a subdomain (with the default resolver and ttl)
-    function register(string calldata name, address owner, uint salt) external {
-        register(name, owner, salt, ens.resolver(radNode), 0);
-    }
-
     /// Register a subdomain (with a custom resolver and ttl)
-    function register(
-        string memory name, address owner, uint salt, address resolver, uint64 ttl
-    ) public {
+    function register(string memory name, address owner, uint salt) public {
         bytes32 label = keccak256(bytes(name));
         bytes32 commitment = commitments.mkCommitment(name, owner, salt);
         uint256 commited = commitments.commited(commitment);
@@ -148,7 +141,7 @@ contract Registrar {
         require(commited != 0, "Registrar::register: must commit before registration");
         require(commited + minCommitmentAge < block.number, "Registrar::register: commitment too new");
 
-        ens.setSubnodeRecord(radNode, label, owner, resolver, ttl);
+        ens.setSubnodeRecord(radNode, label, owner, ens.resolver(radNode), ens.ttl(radNode));
 
         emit NameRegistered(name, label, owner);
     }
