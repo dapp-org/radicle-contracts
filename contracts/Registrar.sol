@@ -3,7 +3,7 @@
 pragma solidity ^0.7.5;
 
 import "@ensdomains/ens/contracts/ENS.sol";
-import "@openzeppelin/contracts/token/ERC20/ERC20Burnable.sol";
+import "./Governance/RadicleToken.sol";
 import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 
 // commitments are kept in a seperate contract to allow the state to be reused
@@ -28,12 +28,6 @@ contract Commitments {
     function commit(bytes32 commitment) external auth {
         commited[commitment] = block.number;
     }
-
-    function mkCommitment(
-        string calldata name, address owner, uint salt
-    ) external pure returns (bytes32) {
-        return keccak256(abi.encodePacked(name, owner, salt));
-    }
 }
 
 contract Registrar {
@@ -44,7 +38,7 @@ contract Registrar {
     ENS public ens;
 
     /// The Radicle ERC20 token.
-    ERC20Burnable public immutable rad;
+    RadicleToken public immutable rad;
 
     /// The commitment storage contract
     Commitments public immutable commitments = new Commitments();
@@ -59,8 +53,7 @@ contract Registrar {
     uint256 public constant tokenId = uint(keccak256(abi.encodePacked("radicle")));
 
     /// The minimum number of blocks that must have passed between a commitment and name registration
-    // TODO: justify this as a default value...
-    uint256 public minCommitmentAge = 50;
+    uint256 public minCommitmentAge;
 
     /// Registration fee in *Radicle* (uRads).
     uint256 public fee = 1e18;
@@ -109,12 +102,14 @@ contract Registrar {
 
     constructor(
         ENS _ens,
-        ERC20Burnable _rad,
-        address _admin
+        RadicleToken _rad,
+        address _admin,
+        uint _minCommitmentAge
     ) {
         ens = _ens;
         rad = _rad;
         admin = _admin;
+        minCommitmentAge = _minCommitmentAge;
     }
 
     // --- USER FACING METHODS ---
@@ -122,7 +117,6 @@ contract Registrar {
     /// Commit to a future name registration
     function commit(bytes32 commitment) external {
         require(commitments.commited(commitment) == 0, "Registrar::commit: already commited");
-        require(rad.balanceOf(msg.sender) >= fee, "Registrar::register: insufficient rad balance");
 
         rad.burnFrom(msg.sender, fee);
         commitments.commit(commitment);
@@ -130,10 +124,22 @@ contract Registrar {
         emit CommitmentMade(commitment, block.number);
     }
 
+    /// Commit to a future name and submit permit in the same transaction
+    function commitWithPermit(bytes32 commitment, address owner, address spender, uint256 value,
+                              uint256 deadline, uint8 v, bytes32 r, bytes32 s) external {
+        rad.permit(owner, spender, value, deadline, v, r, s);
+
+        rad.burnFrom(msg.sender, fee);
+        commitments.commit(commitment);
+
+        emit CommitmentMade(commitment, block.number);
+
+    }
+
     /// Register a subdomain
     function register(string calldata name, address owner, uint salt) external {
         bytes32 label = keccak256(bytes(name));
-        bytes32 commitment = commitments.mkCommitment(name, owner, salt);
+        bytes32 commitment = keccak256(abi.encodePacked(name, owner, salt));
         uint256 commited = commitments.commited(commitment);
 
         require(valid(name), "Registrar::register: invalid name");
