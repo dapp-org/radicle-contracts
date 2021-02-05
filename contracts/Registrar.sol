@@ -130,7 +130,7 @@ contract Registrar {
         emit CommitmentMade(commitment, block.number);
     }
 
-    /// Register a subdomain (with a custom resolver and ttl)
+    /// Register a subdomain
     function register(string calldata name, address owner, uint salt) external {
         bytes32 label = keccak256(bytes(name));
         bytes32 commitment = commitments.mkCommitment(name, owner, salt);
