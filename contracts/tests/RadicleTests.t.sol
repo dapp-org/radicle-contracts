@@ -422,6 +422,60 @@ contract GovernanceTest is DSTest {
         rad.transfer(address(cal), 5_000_000 ether);
     }
 
+    function test_radAddress() public {
+        assertEq(address(rad), address(0xDB356e865AAaFa1e37764121EA9e801Af13eEb83));
+    }
+
+    function test_domainSeparator() public {
+        uint256 chainId;
+        assembly {
+            chainId := chainid()
+        }
+        bytes32 DOMAIN = rad.DOMAIN_SEPARATOR();
+        assertEq(DOMAIN,
+                 keccak256(
+                           abi.encode(
+                                      keccak256("EIP712Domain(string name,uint256 chainId,address verifyingContract)"),
+                                      keccak256(bytes(rad.NAME())),
+                                      chainId,
+                                      address(rad))));
+        log_named_bytes32("DOMAIN_SEPARATOR()", DOMAIN);
+    }
+
+    // generated with
+    // NONCE=0
+    // ETH_KEYSTORE=./secrets
+    // ETH_PASSWORD=./secrets/radical
+    // ETH_FROM=0xd521c744831cfa3ffe472d9f5f9398c9ac806203
+    // ./bin/permit 0xDB356e865AAaFa1e37764121EA9e801Af13eEb83 0xDB356e865AAaFa1e37764121EA9e801Af13eEb83 100 -1
+    function test_permit() public {
+        address owner = 0xD521C744831cFa3ffe472d9F5F9398c9Ac806203;
+        assertEq(rad.nonces(owner), 0);
+        assertEq(rad.allowance(owner, address(rad)), 0);
+        rad.permit(owner, address(rad), 100, uint(-1),
+                   27,
+                   0xfa29797e8b26bd55850f511c675a835eef95f59cc559fe5b322a61cc62843282,
+                   0x1193216cf0ee7ebd93136deb2be2d37a758957f8932c8c05e326541b3468aebd);
+        assertEq(rad.allowance(owner, address(rad)), 100);
+        assertEq(rad.nonces(owner), 1);
+    }
+
+    function test_permit_typehash() public {
+        assertEq(rad.PERMIT_TYPEHASH(), 0x6e71edae12b1b97f4d1f60370fef10105fa2faae0126114a169c64845d6126c9); // seth keccak $(seth --from-ascii "Permit(address owner,address spender,uint256 value,uint256 nonce,uint256 deadline)")
+    }
+
+    function testFail_permit_replay() public {
+        address owner = 0xD521C744831cFa3ffe472d9F5F9398c9Ac806203;
+        rad.permit(owner, address(rad), 100, uint(-1),
+                   27,
+                   0xfa29797e8b26bd55850f511c675a835eef95f59cc559fe5b322a61cc62843282,
+                   0x1193216cf0ee7ebd93136deb2be2d37a758957f8932c8c05e326541b3468aebd);
+        rad.permit(owner, address(rad), 100, uint(-1),
+                   27,
+                   0xfa29797e8b26bd55850f511c675a835eef95f59cc559fe5b322a61cc62843282,
+                   0x1193216cf0ee7ebd93136deb2be2d37a758957f8932c8c05e326541b3468aebd);
+    }
+
     function nextBlock() internal {
         hevm.roll(block.number + 1);
     }

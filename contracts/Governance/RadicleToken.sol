@@ -120,6 +120,13 @@ contract RadicleToken {
         return DECIMALS;
     }
 
+    /* @notice DOMAIN_SEPARATOR */
+    function DOMAIN_SEPARATOR() public view returns (bytes32) {
+        return keccak256(
+                abi.encode(DOMAIN_TYPEHASH, keccak256(bytes(NAME)), getChainId(), address(this))
+               );
+    }
+
     /**
      * @notice Get the number of tokens `spender` is approved to spend on behalf of `account`
      * @param account The address of the account holding the funds
@@ -268,12 +275,8 @@ contract RadicleToken {
         bytes32 r,
         bytes32 s
     ) public {
-        bytes32 domainSeparator =
-            keccak256(
-                abi.encode(DOMAIN_TYPEHASH, keccak256(bytes(NAME)), getChainId(), address(this))
-            );
         bytes32 structHash = keccak256(abi.encode(DELEGATION_TYPEHASH, delegatee, nonce, expiry));
-        bytes32 digest = keccak256(abi.encodePacked("\x19\x01", domainSeparator, structHash));
+        bytes32 digest = keccak256(abi.encodePacked("\x19\x01", DOMAIN_SEPARATOR(), structHash));
         address signatory = ecrecover(digest, v, r, s);
         require(signatory != address(0), "RadicleToken::delegateBySig: invalid signature");
         require(nonce == nonces[signatory]++, "RadicleToken::delegateBySig: invalid nonce");
@@ -299,15 +302,10 @@ contract RadicleToken {
         bytes32 r,
         bytes32 s
     ) public {
-        uint256 nonce = nonces[owner]++;
-        bytes32 domainSeparator =
-            keccak256(
-                abi.encode(DOMAIN_TYPEHASH, keccak256(bytes(NAME)), getChainId(), address(this))
-            );
-        bytes32 structHash = keccak256(abi.encode(PERMIT_TYPEHASH, owner, spender, value, nonce, deadline));
-        bytes32 digest = keccak256(abi.encodePacked("\x19\x01", domainSeparator, structHash));
-        address signatory = ecrecover(digest, v, r, s);
-        require(signatory != address(0), "RadicleToken::permit: invalid signature");
+        bytes32 structHash = keccak256(abi.encode(PERMIT_TYPEHASH, owner, spender, value, nonces[owner]++, deadline));
+        bytes32 digest = keccak256(abi.encodePacked("\x19\x01", DOMAIN_SEPARATOR(), structHash));
+        require(owner == ecrecover(digest, v, r, s), "RadicleToken::permit: invalid signature");
+        require(owner != address(0), "RadicleToken::permit: invalid signature");
         require(block.timestamp <= deadline, "RadicleToken::permit: signature expired");
         _approve(owner, spender, value);
     }
