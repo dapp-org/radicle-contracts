@@ -221,7 +221,6 @@ contract Registrar {
         IERC721 ethRegistrar = IERC721(ens.owner(ethNode));
 
         ens.setOwner(radNode, newOwner);
-        require(ethRegistrar.ownerOf(tokenId) == address(this), "HI");
         ethRegistrar.transferFrom(address(this), newOwner, tokenId);
         commitments.setOwner(newOwner);
 
