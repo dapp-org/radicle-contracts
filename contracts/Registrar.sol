@@ -56,7 +56,7 @@ contract Registrar {
     bytes32 public constant radNode = keccak256(abi.encodePacked(ethNode, keccak256("radicle")));
 
     /// The token ID for the node in the `eth` TLD, eg. sha256("radicle").
-    uint256 public constant tokenId = uint256(keccak256("radicle"));
+    uint256 public constant tokenId = uint(keccak256(abi.encodePacked("radicle")));
 
     /// The minimum number of blocks that must have passed between a commitment and name registration
     // TODO: justify this as a default value...
@@ -152,7 +152,7 @@ contract Registrar {
         require(valid(name), "Registrar::register: invalid name");
         require(available(name), "Registrar::register: name has already been registered");
         require(commited != 0, "Registrar::register: must commit before registration");
-        require(commited + minCommitmentAge > block.number, "Registrar::register: commitment too young");
+        require(commited + minCommitmentAge < block.number, "Registrar::register: commitment too new");
 
         ens.setSubnodeRecord(radNode, label, owner, resolver, ttl);
 
@@ -184,16 +184,11 @@ contract Registrar {
         IERC721 ethRegistrar = IERC721(ens.owner(ethNode));
 
         ens.setOwner(radNode, newOwner);
+        require(ethRegistrar.ownerOf(tokenId) == address(this), "HI");
         ethRegistrar.transferFrom(address(this), newOwner, tokenId);
         commitments.setOwner(newOwner);
 
         emit DomainOwnershipChanged(newOwner);
-    }
-
-    /// Set the commitment timeout
-    function setMinCommitmentAge(uint256 amt) public adminOnly {
-        minCommitmentAge = amt;
-        emit MinCommitmentAgeChanged(amt);
     }
 
     /// Set a new resolver for radicle.eth.
@@ -206,6 +201,12 @@ contract Registrar {
     function setDomainTTL(uint64 ttl) public adminOnly {
         ens.setTTL(radNode, ttl);
         emit TTLChanged(ttl);
+    }
+
+    /// Set the minimum commitment age
+    function setMinCommitmentAge(uint256 amt) public adminOnly {
+        minCommitmentAge = amt;
+        emit MinCommitmentAgeChanged(amt);
     }
 
     /// Set a new registration fee
