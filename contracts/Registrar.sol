@@ -94,12 +94,6 @@ contract Registrar {
     /// @notice The minimum age for a commitment was changed
     event MinCommitmentAgeChanged(uint256 amt);
 
-    // -- MATH --
-
-    function add(uint x, uint y) internal pure returns (uint z) {
-        require((z = x + y) >= x, "Registrar: overflow during addition");
-    }
-
     // --- AUTH ---
 
     /// The contract admin who can set fees.
