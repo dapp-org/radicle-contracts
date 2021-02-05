@@ -40,7 +40,7 @@ contract Registrar {
     // --- DATA ---
 
     /// The ENS registry.
-    ENS public immutable ens;
+    ENS public ens;
 
     /// The Radicle ERC20 token.
     ERC20Burnable public immutable rad;
@@ -85,6 +85,9 @@ contract Registrar {
 
     /// @notice The registration fee was changed
     event TTLChanged(uint64 amt);
+
+    /// @notice The ens registry was updated
+    event EnsChanged(address ens);
 
     /// @notice The commitment timeout was changed
     event CommitmentTimeoutChanged(uint256 amt);
@@ -214,5 +217,11 @@ contract Registrar {
     function setAdmin(address newAdmin) public adminOnly {
         admin = newAdmin;
         emit AdminChanged(newAdmin);
+    }
+
+    /// Set the address for the ENS registry
+    function setEns(address newEns) public adminOnly {
+        ens = ENS(newEns);
+        emit EnsChanged(newEns);
     }
 }
