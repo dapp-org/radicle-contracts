@@ -61,8 +61,9 @@ contract Registrar {
     /// The minimum number of blocks that must have passed between a commitment and name registration
     uint256 public minCommitmentAge;
 
-    /// The maximum time between commiting to a name and registering the name
-    uint256 public commitmentTimeout = 1 days;
+    /// The minimum number of blocks that must have passed between a commitment and name registration
+    // TODO: justify this as a default value...
+    uint256 public minCommitmentAge = 50;
 
     /// Registration fee in *Radicle* (uRads).
     uint256 public fee = 1e18;
@@ -227,9 +228,9 @@ contract Registrar {
     }
 
     /// Set the commitment timeout
-    function setCommitmentTimeout(uint256 amt) public adminOnly {
-        commitmentTimeout = amt;
-        emit CommitmentTimeoutChanged(amt);
+    function setMinCommitmentAge(uint256 amt) public adminOnly {
+        minCommitmentAge = amt;
+        emit MinCommitmentAgeChanged(amt);
     }
 
     /// Set a new resolver for radicle.eth.
