@@ -11,7 +11,6 @@ import {Registrar, Commitments} from "../Registrar.sol";
 
 import {ENS}           from "@ensdomains/ens/contracts/ENS.sol";
 import {ENSRegistry}   from "@ensdomains/ens/contracts/ENSRegistry.sol";
-import {ERC20Burnable} from "@openzeppelin/contracts/token/ERC20/ERC20Burnable.sol";
 import {IERC721}       from "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 
 import {DSTest} from "ds-test/test.sol";
@@ -219,8 +218,9 @@ contract RegistrarRPCTests is DSTest {
         rad = new RadicleToken(address(this));
         registrar = new Registrar(
             ens,
-            ERC20Burnable(address(rad)),
-            address(this)
+            rad,
+            address(this),
+            50
         );
 
         // make the registrar the owner of the radicle.eth domain
@@ -298,8 +298,9 @@ contract RegistrarRPCTests is DSTest {
 
         Registrar registrar2 = new Registrar(
             ens,
-            ERC20Burnable(address(rad)),
-            address(this)
+            rad,
+            address(this),
+            50
         );
         registrar.setDomainOwner(address(registrar2));
         registerWith(registrar2, name);
@@ -340,7 +341,7 @@ contract RegistrarRPCTests is DSTest {
     function registerWith(Registrar reg, string memory name, uint salt) internal {
         uint preBal = rad.balanceOf(address(this));
 
-        bytes32 commitment = reg.commitments().mkCommitment(name, address(this), salt);
+        bytes32 commitment = keccak256(abi.encodePacked(name, address(this), salt));
         rad.approve(address(reg), uint(-1));
 
         reg.commit(commitment);

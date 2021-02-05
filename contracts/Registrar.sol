@@ -46,9 +46,6 @@ contract Registrar {
     /// The commitment storage contract
     Commitments public immutable commitments = new Commitments();
 
-    /// The commitment storage contract
-    Commitments public immutable commitments = new Commitments();
-
     /// The namehash of the `eth` TLD in the ENS registry, eg. namehash("eth").
     bytes32 public constant ethNode = keccak256(abi.encodePacked(bytes32(0), keccak256("eth")));
 
@@ -62,8 +59,7 @@ contract Registrar {
     uint256 public minCommitmentAge;
 
     /// The minimum number of blocks that must have passed between a commitment and name registration
-    // TODO: justify this as a default value...
-    uint256 public minCommitmentAge = 50;
+    uint256 public minCommitmentAge;
 
     /// Registration fee in *Radicle* (uRads).
     uint256 public fee = 1e18;
@@ -122,9 +118,9 @@ contract Registrar {
         ENS _ens,
         RadicleToken _rad,
         address _admin,
-        uint _minCommitmentAge,
         bytes32 _radNode,
         uint _tokenId
+        uint _minCommitmentAge
     ) {
         ens = _ens;
         rad = _rad;
@@ -178,6 +174,18 @@ contract Registrar {
         commitments.commit(commitment);
 
         emit CommitmentMade(commitment, block.number);
+    }
+
+    /// Commit to a future name and submit permit in the same transaction
+    function commitWithPermit(bytes32 commitment, address owner, address spender, uint256 value,
+                              uint256 deadline, uint8 v, bytes32 r, bytes32 s) external {
+        rad.permit(owner, spender, value, deadline, v, r, s);
+
+        rad.burnFrom(msg.sender, fee);
+        commitments.commit(commitment);
+
+        emit CommitmentMade(commitment, block.number);
+
     }
 
     /// Register a subdomain
