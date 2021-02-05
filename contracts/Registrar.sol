@@ -221,16 +221,11 @@ contract Registrar {
         IERC721 ethRegistrar = IERC721(ens.owner(ethNode));
 
         ens.setOwner(radNode, newOwner);
+        require(ethRegistrar.ownerOf(tokenId) == address(this), "HI");
         ethRegistrar.transferFrom(address(this), newOwner, tokenId);
         commitments.setOwner(newOwner);
 
         emit DomainOwnershipChanged(newOwner);
-    }
-
-    /// Set the commitment timeout
-    function setMinCommitmentAge(uint256 amt) public adminOnly {
-        minCommitmentAge = amt;
-        emit MinCommitmentAgeChanged(amt);
     }
 
     /// Set a new resolver for radicle.eth.
