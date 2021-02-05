@@ -123,8 +123,8 @@ contract RadicleToken {
     /* @notice DOMAIN_SEPARATOR */
     function DOMAIN_SEPARATOR() public view returns (bytes32) {
         return keccak256(
-                abi.encode(DOMAIN_TYPEHASH, keccak256(bytes(NAME)), getChainId(), address(this))
-               );
+            abi.encode(DOMAIN_TYPEHASH, keccak256(bytes(NAME)), getChainId(), address(this))
+        );
     }
 
     /**
