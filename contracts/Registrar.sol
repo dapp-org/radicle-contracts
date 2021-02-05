@@ -131,7 +131,7 @@ contract Registrar {
     }
 
     /// Register a subdomain (with a custom resolver and ttl)
-    function register(string memory name, address owner, uint salt) public {
+    function register(string calldata name, address owner, uint salt) external {
         bytes32 label = keccak256(bytes(name));
         bytes32 commitment = commitments.mkCommitment(name, owner, salt);
         uint256 commited = commitments.commited(commitment);
