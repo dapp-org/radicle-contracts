@@ -40,6 +40,9 @@ contract Registrar {
     /// The Radicle ERC20 token.
     RadicleToken public immutable rad;
 
+    /// @notice EIP-712 name for this contract
+    string public constant NAME = "Registrar";
+
     /// The commitment storage contract
     Commitments public immutable commitments = new Commitments();
 
@@ -57,6 +60,17 @@ contract Registrar {
 
     /// Registration fee in *Radicle* (uRads).
     uint256 public fee = 1e18;
+
+    /// @notice The EIP-712 typehash for the contract's domain
+    bytes32 public constant DOMAIN_TYPEHASH =
+        keccak256("EIP712Domain(string name,uint256 chainId,address verifyingContract)");
+
+    /// @notice The EIP-712 typehash for the delegation struct used by the contract
+    bytes32 public constant COMMIT_TYPEHASH =
+        keccak256("Commit(bytes32 commitment,uint256 nonce,uint256 expiry,uint256 submissionFee)");
+
+    /// @notice A record of states for signing / validating signatures
+    mapping(address => uint256) public nonces;
 
     // --- LOGS ---
 
@@ -116,19 +130,47 @@ contract Registrar {
 
     /// Commit to a future name registration
     function commit(bytes32 commitment) public {
-        require(commitments.commited(commitment) == 0, "Registrar::commit: already commited");
-
-        rad.burnFrom(msg.sender, fee);
-        commitments.commit(commitment);
-
-        emit CommitmentMade(commitment, block.number);
+        _commit(msg.sender, commitment);
     }
 
     /// Commit to a future name and submit permit in the same transaction
     function commitWithPermit(bytes32 commitment, address owner, address spender, uint256 value,
                               uint256 deadline, uint8 v, bytes32 r, bytes32 s) external {
         rad.permit(owner, spender, value, deadline, v, r, s);
-        commit(commitment);
+        _commit(msg.sender, commitment);
+    }
+
+    function commitBySig(bytes32 commitment, uint256 nonce, uint256 expiry, uint256 submissionFee,
+                         uint8 v, bytes32 r, bytes32 s) public {
+        bytes32 domainSeparator =
+            keccak256(
+                abi.encode(DOMAIN_TYPEHASH, keccak256(bytes(NAME)), getChainId(), address(this))
+            );
+        bytes32 structHash = keccak256(abi.encode(COMMIT_TYPEHASH, commitment, nonce, expiry, submissionFee));
+        bytes32 digest = keccak256(abi.encodePacked("\x19\x01", domainSeparator, structHash));
+        address signatory = ecrecover(digest, v, r, s);
+        require(signatory != address(0), "Registrar::commitBySig: invalid signature");
+        require(nonce == nonces[signatory]++, "Registrar::commitBySig: invalid nonce");
+        require(block.timestamp <= expiry, "Registrar::commitBySig: signature expired");
+        rad.transferFrom(signatory, msg.sender, submissionFee);
+        _commit(signatory, commitment);
+    }
+
+    function commitBySigWithPermit(bytes32 commitment, uint256 nonce, uint256 expiry, uint256 submissionFee,
+                                   uint8 v, bytes32 r, bytes32 s,
+                                   address owner, address spender, uint256 value, uint256 deadline,
+                                   uint8 permit_v, bytes32 permit_r, bytes32 permit_s) public {
+        rad.permit(owner, spender, value, deadline, permit_v, permit_r, permit_s);
+        commitBySig(commitment, nonce, expiry, submissionFee, v, r, s);
+    }
+
+    function _commit(address payer, bytes32 commitment) internal {
+        require(commitments.commited(commitment) == 0, "Registrar::commit: already commited");
+
+        rad.burnFrom(payer, fee);
+        commitments.commit(commitment);
+
+        emit CommitmentMade(commitment, block.number);
     }
 
     /// Register a subdomain
@@ -212,5 +254,14 @@ contract Registrar {
     function setEns(address newEns) public adminOnly {
         ens = ENS(newEns);
         emit EnsChanged(newEns);
+    }
+
+    function getChainId() internal pure returns (uint256) {
+        uint256 chainId;
+        // solhint-disable no-inline-assembly
+        assembly {
+            chainId := chainid()
+        }
+        return chainId;
     }
 }
