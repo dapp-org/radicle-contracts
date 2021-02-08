@@ -7,10 +7,10 @@ import {Governor}      from "../Governance/Governor.sol";
 import {Timelock}      from "../Governance/Timelock.sol";
 import {Treasury}      from "../Governance/Treasury.sol";
 import {VestingToken}  from "../Governance/VestingToken.sol";
-import {Registrar}     from "../Registrar.sol";
+import {Registrar, Commitments} from "../Registrar.sol";
+
 import {ENS}           from "@ensdomains/ens/contracts/ENS.sol";
 import {ENSRegistry}   from "@ensdomains/ens/contracts/ENSRegistry.sol";
-import {ERC20Burnable} from "@openzeppelin/contracts/token/ERC20/ERC20Burnable.sol";
 import {IERC721}       from "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 
 import {DSTest} from "ds-test/test.sol";
@@ -218,12 +218,11 @@ contract RegistrarRPCTests is DSTest {
         rad = new RadicleToken(address(this));
         registrar = new Registrar(
             ens,
+            rad,
+            address(this),
+            50,
             domain,
-            tokenId,
-            address(0), // irrelevant in this version
-            address(0), // irrelevant in this version
-            ERC20Burnable(address(rad)),
-            address(this)
+            tokenId
         );
 
         // make the registrar the owner of the radicle.eth domain
@@ -251,6 +250,7 @@ contract RegistrarRPCTests is DSTest {
             0x27a5c9c1f678324d928c72a6ff8a66d3c79aa98b4c10804760d4542336658cc7,
             bytes32(uint(1))
         );
+
     }
 
     // --- tests ---
@@ -282,13 +282,13 @@ contract RegistrarRPCTests is DSTest {
         if (bytes(name).length == 0) return;
         if (bytes(name).length > 32) return;
         bytes32 node = Utils.namehash([name, "radicle", "eth"]);
-        registerWith(registrar, name);
+        registerWith(registrar, name, 666);
 
         ens.setOwner(node, address(0));
         assertEq(ens.owner(node), address(0));
         assertTrue(ens.recordExists(node));
 
-        registerWith(registrar, name);
+        registerWith(registrar, name, 667);
         assertEq(ens.owner(node), address(this));
     }
 
@@ -300,12 +300,11 @@ contract RegistrarRPCTests is DSTest {
 
         Registrar registrar2 = new Registrar(
             ens,
+            rad,
+            address(this),
+            50,
             domain,
-            tokenId,
-            address(0), // irrelevant in this version
-            address(0), // irrelevant in this version
-            ERC20Burnable(address(rad)),
-            address(this)
+            tokenId
         );
         registrar.setDomainOwner(address(registrar2));
         registerWith(registrar2, name);
@@ -340,10 +339,18 @@ contract RegistrarRPCTests is DSTest {
     // --- helpers ---
 
     function registerWith(Registrar reg, string memory name) internal {
+        registerWith(reg, name, 42069);
+    }
+
+    function registerWith(Registrar reg, string memory name, uint salt) internal {
         uint preBal = rad.balanceOf(address(this));
 
+        bytes32 commitment = keccak256(abi.encodePacked(name, address(this), salt));
         rad.approve(address(reg), uint(-1));
-        reg.registerRad(name, address(this));
+
+        reg.commit(commitment);
+        hevm.roll(block.number + 100);
+        reg.register(name, address(this), salt);
 
         assertEq(rad.balanceOf(address(this)), preBal - 1 ether);
     }
