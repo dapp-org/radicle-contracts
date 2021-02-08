@@ -220,7 +220,9 @@ contract RegistrarRPCTests is DSTest {
             ens,
             rad,
             address(this),
-            50
+            50,
+            domain,
+            tokenId
         );
 
         // make the registrar the owner of the radicle.eth domain
@@ -300,7 +302,9 @@ contract RegistrarRPCTests is DSTest {
             ens,
             rad,
             address(this),
-            50
+            50,
+            domain,
+            tokenId
         );
         registrar.setDomainOwner(address(registrar2));
         registerWith(registrar2, name);

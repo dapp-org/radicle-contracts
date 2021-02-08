@@ -58,11 +58,8 @@ contract Registrar {
     /// The minimum number of blocks that must have passed between a commitment and name registration
     uint256 public minCommitmentAge;
 
-    /// The minimum number of blocks that must have passed between a commitment and name registration
-    uint256 public minCommitmentAge;
-
     /// Registration fee in *Radicle* (uRads).
-    uint256 public fee = 1e18;
+    uint256 public registrationFeeRad = 1e18;
 
     /// @notice The EIP-712 typehash for the contract's domain
     bytes32 public constant DOMAIN_TYPEHASH =
@@ -176,43 +173,6 @@ contract Registrar {
         emit CommitmentMade(commitment, block.number);
     }
 
-    /// Commit to a future name and submit permit in the same transaction
-    function commitWithPermit(bytes32 commitment, address owner, address spender, uint256 value,
-                              uint256 deadline, uint8 v, bytes32 r, bytes32 s) external {
-        rad.permit(owner, spender, value, deadline, v, r, s);
-        _commit(msg.sender, commitment);
-    }
-
-    function commitBySig(bytes32 commitment, uint256 nonce, uint256 expiry, uint256 submissionFee, uint8 v, bytes32 r, bytes32 s) public {
-        bytes32 domainSeparator =
-            keccak256(
-                abi.encode(DOMAIN_TYPEHASH, keccak256(bytes(NAME)), getChainId(), address(this))
-            );
-        bytes32 structHash = keccak256(abi.encode(COMMIT_TYPEHASH, commitment, nonce, expiry, submissionFee));
-        bytes32 digest = keccak256(abi.encodePacked("\x19\x01", domainSeparator, structHash));
-        address signatory = ecrecover(digest, v, r, s);
-        require(signatory != address(0), "Registrar::commitBySig: invalid signature");
-        require(nonce == nonces[signatory]++, "Registrar::commitBySig: invalid nonce");
-        require(block.timestamp <= expiry, "Registrar::commitBySig: signature expired");
-        rad.transferFrom(signatory, msg.sender, submissionFee);
-        _commit(signatory, commitment);
-    }
-
-    function commitBySigWithPermit(bytes32 commitment, uint256 nonce, uint256 expiry, uint256 submissionFee, uint8 v, bytes32 r, bytes32 s,
-                                   address owner, address spender, uint256 value, uint256 deadline, uint8 permit_v, bytes32 permit_r, bytes32 permit_s) public {
-        rad.permit(owner, spender, value, deadline, permit_v, permit_r, permit_s);
-        commitBySig(commitment, nonce, expiry, submissionFee, v, r, s);
-    }
-
-    function _commit(address payer, bytes32 commitment) internal {
-        require(commitments.commited(commitment) == 0, "Registrar::commit: already commited");
-
-        rad.burnFrom(payer, fee);
-        commitments.commit(commitment);
-
-        emit CommitmentMade(commitment, block.number);
-    }
-
     /// Register a subdomain
     function register(string calldata name, address owner, uint salt) external {
         bytes32 label = keccak256(bytes(name));
@@ -279,7 +239,7 @@ contract Registrar {
     }
 
     /// Set a new registration fee
-    function setRadRegistrationFee(uint256 amt) public adminOnly {
+    function setRegistrationRadFee(uint256 amt) public adminOnly {
         registrationFeeRad = amt;
         emit RegistrationRadFeeChanged(amt);
     }
@@ -288,15 +248,6 @@ contract Registrar {
     function setAdmin(address newAdmin) public adminOnly {
         admin = newAdmin;
         emit AdminChanged(newAdmin);
-    }
-
-    function getChainId() internal pure returns (uint256) {
-        uint256 chainId;
-        // solhint-disable no-inline-assembly
-        assembly {
-            chainId := chainid()
-        }
-        return chainId;
     }
 
     function getChainId() internal pure returns (uint256) {
