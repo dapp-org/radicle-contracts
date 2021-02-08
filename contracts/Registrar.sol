@@ -35,7 +35,7 @@ contract Registrar {
     // --- DATA ---
 
     /// The ENS registry.
-    ENS public ens;
+    ENS public immutable ens;
 
     /// The Radicle ERC20 token.
     RadicleToken public immutable rad;
@@ -50,16 +50,16 @@ contract Registrar {
     bytes32 public constant ethNode = keccak256(abi.encodePacked(bytes32(0), keccak256("eth")));
 
     /// The namehash of the node in the `eth` TLD, eg. namehash("radicle.eth").
-    bytes32 public constant radNode = keccak256(abi.encodePacked(ethNode, keccak256("radicle")));
+    bytes32 public immutable radNode;
 
     /// The token ID for the node in the `eth` TLD, eg. sha256("radicle").
-    uint256 public constant tokenId = uint(keccak256(abi.encodePacked("radicle")));
+    uint256 public immutable tokenId;
 
     /// The minimum number of blocks that must have passed between a commitment and name registration
     uint256 public minCommitmentAge;
 
     /// Registration fee in *Radicle* (uRads).
-    uint256 public fee = 1e18;
+    uint256 public registrationFeeRad = 1e18;
 
     /// @notice The EIP-712 typehash for the contract's domain
     bytes32 public constant DOMAIN_TYPEHASH =
@@ -84,19 +84,16 @@ contract Registrar {
     event AdminChanged(address newAdmin);
 
     /// @notice The registration fee was changed
-    event RegistrationFeeChanged(uint amt);
+    event RegistrationRadFeeChanged(uint amt);
 
     /// @notice The ownership of the domain was changed
     event DomainOwnershipChanged(address newOwner);
 
-    /// @notice The registration fee was changed
+    /// @notice The resolver changed
     event ResolverChanged(address resolver);
 
-    /// @notice The registration fee was changed
+    /// @notice The ttl changed
     event TTLChanged(uint64 amt);
-
-    /// @notice The ens registry was updated
-    event EnsChanged(address ens);
 
     /// @notice The minimum age for a commitment was changed
     event MinCommitmentAgeChanged(uint256 amt);
@@ -118,12 +115,16 @@ contract Registrar {
         ENS _ens,
         RadicleToken _rad,
         address _admin,
-        uint _minCommitmentAge
+        uint _minCommitmentAge,
+        bytes32 _radNode,
+        uint _tokenId
     ) {
         ens = _ens;
         rad = _rad;
         admin = _admin;
         minCommitmentAge = _minCommitmentAge;
+        radNode = _radNode;
+        tokenId = _tokenId;
     }
 
     // --- USER FACING METHODS ---
@@ -134,12 +135,13 @@ contract Registrar {
     }
 
     /// Commit to a future name and submit permit in the same transaction
-    function commitWithPermit(bytes32 commitment, address owner, address spender, uint256 value,
+    function commitWithPermit(bytes32 commitment, address owner, uint256 value,
                               uint256 deadline, uint8 v, bytes32 r, bytes32 s) external {
-        rad.permit(owner, spender, value, deadline, v, r, s);
+        rad.permit(owner, address(this), value, deadline, v, r, s);
         _commit(msg.sender, commitment);
     }
 
+    /// Commit to a future name with a 712-signed message
     function commitBySig(bytes32 commitment, uint256 nonce, uint256 expiry, uint256 submissionFee, uint8 v, bytes32 r, bytes32 s) public {
         bytes32 domainSeparator =
             keccak256(
@@ -155,16 +157,17 @@ contract Registrar {
         _commit(signatory, commitment);
     }
 
+    /// Commit to a future name with a 712-signed message and submit permit in the same transaction
     function commitBySigWithPermit(bytes32 commitment, uint256 nonce, uint256 expiry, uint256 submissionFee, uint8 v, bytes32 r, bytes32 s,
-                                   address owner, address spender, uint256 value, uint256 deadline, uint8 permit_v, bytes32 permit_r, bytes32 permit_s) public {
-        rad.permit(owner, spender, value, deadline, permit_v, permit_r, permit_s);
+                                   address owner, uint256 value, uint256 deadline, uint8 permit_v, bytes32 permit_r, bytes32 permit_s) public {
+        rad.permit(owner, address(this), value, deadline, permit_v, permit_r, permit_s);
         commitBySig(commitment, nonce, expiry, submissionFee, v, r, s);
     }
 
     function _commit(address payer, bytes32 commitment) internal {
         require(commitments.commited(commitment) == 0, "Registrar::commit: already commited");
 
-        rad.burnFrom(payer, fee);
+        rad.burnFrom(payer, registrationFeeRad);
         commitments.commit(commitment);
 
         emit CommitmentMade(commitment, block.number);
@@ -236,21 +239,15 @@ contract Registrar {
     }
 
     /// Set a new registration fee
-    function setRegistrationFee(uint256 amt) public adminOnly {
-        fee = amt;
-        emit RegistrationFeeChanged(amt);
+    function setRegistrationRadFee(uint256 amt) public adminOnly {
+        registrationFeeRad = amt;
+        emit RegistrationRadFeeChanged(amt);
     }
 
     /// Set a new admin
     function setAdmin(address newAdmin) public adminOnly {
         admin = newAdmin;
         emit AdminChanged(newAdmin);
-    }
-
-    /// Set the address for the ENS registry
-    function setEns(address newEns) public adminOnly {
-        ens = ENS(newEns);
-        emit EnsChanged(newEns);
     }
 
     function getChainId() internal pure returns (uint256) {
