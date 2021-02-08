@@ -47,7 +47,7 @@ contract RadicleToken {
     // Official record of token balances for each account
     mapping(address => uint96) internal balances;
 
-    /// @notice A record of each accounts delegate
+    /// @notice A record of each account's delegate
     mapping(address => address) public delegates;
 
     /// @notice A checkpoint for marking number of votes from a given block
@@ -76,14 +76,14 @@ contract RadicleToken {
     /// @notice A record of states for signing / validating signatures
     mapping(address => uint256) public nonces;
 
-    /// @notice An event thats emitted when an account changes its delegate
+    /// @notice An event that's emitted when an account changes its delegate
     event DelegateChanged(
         address indexed delegator,
         address indexed fromDelegate,
         address indexed toDelegate
     );
 
-    /// @notice An event thats emitted when a delegate account's vote balance changes
+    /// @notice An event that's emitted when a delegate account's vote balance changes
     event DelegateVotesChanged(
         address indexed delegate,
         uint256 previousBalance,
