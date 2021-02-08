@@ -244,7 +244,8 @@ contract Governor {
                 proposal.values[i],
                 proposal.signatures[i],
                 proposal.calldatas[i],
-                eta
+                eta,
+                i
             );
         }
         proposal.eta = eta;
@@ -256,15 +257,16 @@ contract Governor {
         uint256 value,
         string memory signature,
         bytes memory data,
-        uint256 eta
+        uint256 eta,
+        uint256 index
     ) internal {
         require(
             !timelock.queuedTransactions(
-                keccak256(abi.encode(target, value, signature, data, eta))
+                keccak256(abi.encode(target, value, signature, data, eta, index))
             ),
             "Governor::_queueOrRevert: proposal action already queued at eta"
         );
-        timelock.queueTransaction(target, value, signature, data, eta);
+        timelock.queueTransaction(target, value, signature, data, eta, index);
     }
 
     function execute(uint256 proposalId) public payable {
@@ -280,7 +282,8 @@ contract Governor {
                 proposal.values[i],
                 proposal.signatures[i],
                 proposal.calldatas[i],
-                proposal.eta
+                proposal.eta,
+                i
             );
         }
         emit ProposalExecuted(proposalId);
@@ -308,7 +311,8 @@ contract Governor {
                 proposal.values[i],
                 proposal.signatures[i],
                 proposal.calldatas[i],
-                proposal.eta
+                proposal.eta,
+                i
             );
         }
 
@@ -482,6 +486,15 @@ interface TimelockInterface {
         uint256 eta
     ) external returns (bytes32);
 
+    function queueTransaction(
+        address target,
+        uint256 value,
+        string calldata signature,
+        bytes calldata data,
+        uint256 eta,
+        uint256 index
+    ) external returns (bytes32);
+
     function cancelTransaction(
         address target,
         uint256 value,
@@ -490,12 +503,30 @@ interface TimelockInterface {
         uint256 eta
     ) external;
 
+    function cancelTransaction(
+        address target,
+        uint256 value,
+        string calldata signature,
+        bytes calldata data,
+        uint256 eta,
+        uint256 index
+    ) external;
+
     function executeTransaction(
         address target,
         uint256 value,
         string calldata signature,
         bytes calldata data,
         uint256 eta
+    ) external payable returns (bytes memory);
+
+    function executeTransaction(
+        address target,
+        uint256 value,
+        string calldata signature,
+        bytes calldata data,
+        uint256 eta,
+        uint256 index
     ) external payable returns (bytes memory);
 }
 

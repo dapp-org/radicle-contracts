@@ -377,6 +377,22 @@ contract RadUser {
         calldatas[0] = cd;
         return gov.propose(targets, values, sigs, calldatas, "");
     }
+
+    function proposeSameTarget(address target, string memory sig, bytes memory cd) public returns (uint) {
+        address[] memory targets = new address[](2);
+        uint[] memory values = new uint[](2);
+        string[] memory sigs = new string[](2);
+        bytes[] memory calldatas = new bytes[](2);
+        targets[0] = target;
+        values[0] = 0;
+        sigs[0] = sig;
+        calldatas[0] = cd;
+        targets[1] = target;
+        values[1] = 0;
+        sigs[1] = sig;
+        calldatas[1] = cd;
+        return gov.propose(targets, values, sigs, calldatas, "");
+    }
     function queue(uint proposalId) public {
         gov.queue(proposalId);
     }
@@ -395,6 +411,7 @@ contract GovernanceTest is DSTest {
     Timelock timelock;
 
     uint x; // only writeable by timelock
+    uint count;
 
     Hevm hevm = Hevm(HEVM_ADDRESS);
 
@@ -420,6 +437,7 @@ contract GovernanceTest is DSTest {
         rad.transfer(address(bob), 500_001 ether);
         // quorum is 4%
         rad.transfer(address(cal), 5_000_000 ether);
+        count = uint(0);
     }
 
     function test_radAddress() public {
@@ -485,6 +503,11 @@ contract GovernanceTest is DSTest {
         x = _x;
     }
 
+    function counter(uint _x) public {
+        require(msg.sender == address(timelock));
+        count += _x;
+    }
+
     function test_Delegate(uint96 a, uint96 b, uint96 c, address d, address e) public {
         if (a > 100000000 ether) return;
         if (uint(b) + uint(c) > uint(a)) return;
@@ -547,6 +570,69 @@ contract GovernanceTest is DSTest {
         gov.execute(id);
         assertEq(uint(gov.state(id)), 7, "proposal is executed");
         assertEq(x, 1, "x is modified");
+    }
+
+    function test_vote_to_execution_counter() public {
+        ali.delegate(address(bob));
+        bob.delegate(address(bob));
+        cal.delegate(address(cal));
+        nextBlock();
+        uint id = bob.propose(address(this), "counter(uint256)", abi.encode(uint(1)));
+        assertEq(uint(gov.state(id)), 0 , "proposal is pending");
+
+        // proposal is Pending until block.number + votingDelay + 1
+        hevm.roll(block.number + gov.votingDelay() + 1);
+        assertEq(uint(gov.state(id)), 1, "proposal is active");
+
+        // votes cast must have been checkpointed by delegation, and
+        // exceed the quorum and votes against
+        cal.castVote(id, true);
+        hevm.roll(block.number + gov.votingPeriod());
+        assertEq(uint(gov.state(id)), 4, "proposal is successful");
+
+        // queueing succeeds unless already queued
+        // (N.B. cannot queue multiple calls to same signature as-is)
+        bob.queue(id);
+        assertEq(uint(gov.state(id)), 5, "proposal is queued");
+
+        // can only execute following time delay
+        assertEq(x, 0, "x is unmodified");
+        hevm.warp(block.timestamp + 2 days);
+        gov.execute(id);
+        assertEq(uint(gov.state(id)), 7, "proposal is executed");
+        assertEq(count, 1, "count is modified");
+    }
+
+    // fails prior to adding index modification to governor and timelock
+    function test_vote_to_execution_allow_duplicate_operations() public {
+        ali.delegate(address(bob));
+        bob.delegate(address(bob));
+        cal.delegate(address(cal));
+        nextBlock();
+        uint id = bob.proposeSameTarget(address(this), "counter(uint256)", abi.encode(uint(1)));
+        assertEq(uint(gov.state(id)), 0 , "proposal is pending");
+
+        // proposal is Pending until block.number + votingDelay + 1
+        hevm.roll(block.number + gov.votingDelay() + 1);
+        assertEq(uint(gov.state(id)), 1, "proposal is active");
+
+        // votes cast must have been checkpointed by delegation, and
+        // exceed the quorum and votes against
+        cal.castVote(id, true);
+        hevm.roll(block.number + gov.votingPeriod());
+        assertEq(uint(gov.state(id)), 4, "proposal is successful");
+
+        // queueing succeeds unless already queued
+        // (N.B. cannot queue multiple calls to same signature as-is)
+        bob.queue(id);
+        assertEq(uint(gov.state(id)), 5, "proposal is queued");
+
+        // can only execute following time delay
+        assertEq(x, 0, "x is unmodified");
+        hevm.warp(block.timestamp + 2 days);
+        gov.execute(id);
+        assertEq(uint(gov.state(id)), 7, "proposal is executed");
+        assertEq(count, 2, "count is modified");
     }
 }
 
