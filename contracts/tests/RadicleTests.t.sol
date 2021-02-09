@@ -5,7 +5,6 @@ pragma abicoder v2;
 import {RadicleToken}  from "../Governance/RadicleToken.sol";
 import {Governor}      from "../Governance/Governor.sol";
 import {Timelock}      from "../Governance/Timelock.sol";
-import {Treasury}      from "../Governance/Treasury.sol";
 import {VestingToken}  from "../Governance/VestingToken.sol";
 import {Registrar, Commitments} from "../Registrar.sol";
 
@@ -183,23 +182,6 @@ contract VestingTokenTests is DSTest, DSMath {
         owner.terminateVesting(vest);
 
         assertEq(vest.withdrawn(), add(withdrawn, withdrawable), "post-termination");
-    }
-}
-
-contract TreasuryTests is DSTest {
-    Hevm hevm = Hevm(HEVM_ADDRESS);
-    Treasury treasury;
-
-    function setUp() public {
-        treasury = new Treasury(address(this));
-    }
-
-    function test_initial() public {
-        assertEq(treasury.admin(), address(this));
-        address(treasury).transfer(100 ether);
-        assertEq(address(treasury).balance, 100 ether);
-        treasury.withdraw(address(2), 10 ether);
-        assertEq(address(treasury).balance, 90 ether);
     }
 }
 
