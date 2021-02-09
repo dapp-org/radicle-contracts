@@ -1,9 +1,10 @@
 #!/usr/bin/env bash
 ### token-permit -- sign (and submit) EIP2612 or DAI style permits
 set -e
+set -x
 
 display_usage() {
-  echo "Usage: token permit <token> <spender> [<amount|allowed>] [<deadline|expiry>] [--submit]"
+  echo "Usage: token permit <spender> [<amount|allowed>] [<deadline|expiry>] [--submit]"
 }
 
 for i in "$@"; do
@@ -24,25 +25,24 @@ if [ $# -lt 2 ];  then
     exit 1
 fi
 
-TOKEN=$1
-SPENDER=$2
+SPENDER=$1
 
 PERMIT_TYPEHASH=$(seth keccak $(seth --from-ascii "Permit(address owner,address spender,uint256 value,uint256 nonce,uint256 deadline)"))
 
 if [ -z ${DAI+x} ]; then
-    VALUE=$(seth --to-uint256 ${3:-$(seth --to-int256 -1)})
+    VALUE=$(seth --to-uint256 ${2:-$(seth --to-int256 -1)})
 else
-    VALUE=$(seth --to-uint256 ${3:-"1"})
+    VALUE=$(seth --to-uint256 ${2:-"1"})
 fi
 
 if [[ -z $DEADLINE ]] && [ -z ${DAI+x} ]; then
-    DEADLINE=$(seth --to-int256 ${4:-"-1"})
+    DEADLINE=$(seth --to-int256 ${3:-"-1"})
 elif [[ -z $DEADLINE ]]; then
-    DEADLINE=$(seth --to-int256 ${4:-0})
+    DEADLINE=$(seth --to-int256 ${3:-0})
 fi
-DOMAIN_SEPARATOR=0xfa174b05dfa807f2a62120157f1df500788792eae995b5d393894aaa8408cc94 # specialized to current deployment address, see https://github.com/dapphub/dapptools/blob/master/src/token/libexec/token/token-permit for general variant
+DOMAIN_SEPARATOR=0xced602f1565a21d05b4f8bff0aa7b9258b11af40d28c98919a4aa26681d5233b # specialized to current deployment address, see https://github.com/dapphub/dapptools/blob/master/src/token/libexec/token/token-permit for general variant
 
-if [[ -z $NONCE ]]; then
+if [[ -z "$NONCE" ]]; then
     NONCE=$(seth call $TOKEN "nonces(address)(bytes32)" $ETH_FROM)
 else
     NONCE=$(seth --to-uint256 $NONCE)

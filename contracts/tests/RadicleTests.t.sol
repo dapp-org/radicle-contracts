@@ -195,17 +195,18 @@ contract RegistrarRPCTests is DSTest {
 
     function setUp() public {
         domain = Utils.namehash(["radicle", "eth"]);
-        tokenId = uint(keccak256(abi.encodePacked("radicle"))); // seth keccak radicle
         ens = ENS(0x00000000000C2E074eC69A0dFb2997BA6C7d2e1e);
-        rad = new RadicleToken(address(this));
-        registrar = new Registrar(
-            ens,
-            rad,
-            address(this),
-            50,
-            domain,
-            tokenId
-        );
+        tokenId = uint(keccak256(abi.encodePacked("radicle"))); // seth keccak radicle
+        Phase0 phase0 = new Phase0( address(this)
+                                    , 2 days
+                                    , address(this)
+                                    , ens
+                                    , domain
+                                    , "radicle"
+                                    );
+        registrar = phase0.registrar();
+        rad = phase0.token();
+        log_named_address("Registrar", address(registrar));
 
         // make the registrar the owner of the radicle.eth domain
         hevm.store(
@@ -214,10 +215,10 @@ contract RegistrarRPCTests is DSTest {
             Utils.asBytes32(address(registrar))
         );
 
-        // make the registrar the owner of the radicle.eth 721 token
+        // the ethRegistrar is owner of `eth` namespace
         address ethRegistrarAddr = ens.owner(Utils.namehash(["eth"]));
 
-        // owner[tokenId]
+        // set owner["radicle"] = address(registrar)
         // TODO: make this less inscrutible
         hevm.store(
             ethRegistrarAddr,
@@ -276,6 +277,8 @@ contract RegistrarRPCTests is DSTest {
 
     // domain registration still works after transfering ownership of the
     // "radicle.eth" domain to a new registrar
+    // TODO: the Timelock is the admin of the Registrar,
+    // so we will need to make a proposal to perform this transition.
     function test_register_with_new_owner(string memory name) public {
         if (bytes(name).length == 0) return;
         if (bytes(name).length > 32) return;
@@ -323,6 +326,14 @@ contract RegistrarRPCTests is DSTest {
     function registerWith(Registrar reg, string memory name) internal {
         registerWith(reg, name, 42069);
     }
+
+    /* function registerFor(Registrar reg, address owner, string memory name, bytes32 r, bytes32 s, uint8 v, bytes32 permit_r, bytes32 permit_s, uint8 permit_v) internal { */
+    /*     uint salt = 150987; */
+    /*     bytes32 commitment = keccak256(abi.encodePacked(name, owner, salt)); */
+    /*     reg.commitBySigWithPermit(commitment, 0, uint(-1), 1 ether, owner, uint(-1), uint(-1), permit_v, permit_r, permit_s); */
+    /*     hevm.roll(block.number + 100); */
+    /*     reg.register(name, owner, salt); */
+    /* } */
 
     function registerWith(Registrar reg, string memory name, uint salt) internal {
         uint preBal = rad.balanceOf(address(this));
@@ -425,7 +436,7 @@ contract GovernanceTest is DSTest {
     }
 
     function test_radAddress() public {
-        assertEq(address(rad), address(0xDB356e865AAaFa1e37764121EA9e801Af13eEb83));
+        assertEq(address(rad), address(0x25E827B40a7D04de0D177BB228A99F69b83fA7FC));
     }
 
     function test_domainSeparator() public {
@@ -445,19 +456,16 @@ contract GovernanceTest is DSTest {
     }
 
     // generated with
-    // NONCE=0
-    // ETH_KEYSTORE=./secrets
-    // ETH_PASSWORD=./secrets/radical
-    // ETH_FROM=0xd521c744831cfa3ffe472d9f5f9398c9ac806203
-    // ./bin/permit 0xDB356e865AAaFa1e37764121EA9e801Af13eEb83 0xDB356e865AAaFa1e37764121EA9e801Af13eEb83 100 -1
+    // export NONCE=0; export ETH_KEYSTORE=./secrets; export ETH_PASSWORD=./secrets/radical; export ETH_FROM=0xd521c744831cfa3ffe472d9f5f9398c9ac806203
+    // ./bin/permit 0x25E827B40a7D04de0D177BB228A99F69b83fA7FC 100 -1
     function test_permit() public {
         address owner = 0xD521C744831cFa3ffe472d9F5F9398c9Ac806203;
         assertEq(rad.nonces(owner), 0);
         assertEq(rad.allowance(owner, address(rad)), 0);
         rad.permit(owner, address(rad), 100, uint(-1),
-                   27,
-                   0xfa29797e8b26bd55850f511c675a835eef95f59cc559fe5b322a61cc62843282,
-                   0x1193216cf0ee7ebd93136deb2be2d37a758957f8932c8c05e326541b3468aebd);
+                   28,
+                   0xb1b88cc9bdd69831879b406e560b29fc6938d556f8f7be5c580ce11cfd3d354e,
+                   0x4ab00b718c09a9f9fb2dd35c2555659bb2b45509b402845bd37b8ef82eb97661);
         assertEq(rad.allowance(owner, address(rad)), 100);
         assertEq(rad.nonces(owner), 1);
     }
@@ -469,13 +477,13 @@ contract GovernanceTest is DSTest {
     function testFail_permit_replay() public {
         address owner = 0xD521C744831cFa3ffe472d9F5F9398c9Ac806203;
         rad.permit(owner, address(rad), 100, uint(-1),
-                   27,
-                   0xfa29797e8b26bd55850f511c675a835eef95f59cc559fe5b322a61cc62843282,
-                   0x1193216cf0ee7ebd93136deb2be2d37a758957f8932c8c05e326541b3468aebd);
+                   28,
+                   0xb1b88cc9bdd69831879b406e560b29fc6938d556f8f7be5c580ce11cfd3d354e,
+                   0x4ab00b718c09a9f9fb2dd35c2555659bb2b45509b402845bd37b8ef82eb97661);
         rad.permit(owner, address(rad), 100, uint(-1),
-                   27,
-                   0xfa29797e8b26bd55850f511c675a835eef95f59cc559fe5b322a61cc62843282,
-                   0x1193216cf0ee7ebd93136deb2be2d37a758957f8932c8c05e326541b3468aebd);
+                   28,
+                   0xb1b88cc9bdd69831879b406e560b29fc6938d556f8f7be5c580ce11cfd3d354e,
+                   0x4ab00b718c09a9f9fb2dd35c2555659bb2b45509b402845bd37b8ef82eb97661);
     }
 
     function nextBlock() internal {
