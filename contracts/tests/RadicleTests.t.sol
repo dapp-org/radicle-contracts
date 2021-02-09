@@ -225,14 +225,14 @@ contract RegistrarRPCTests is DSTest {
             tokenId
         );
 
-        // make the registrar the owner of the radicle.eth domain
+        // make this contract the owner of the radicle.eth domain
         hevm.store(
             address(ens),
             keccak256(abi.encodePacked(domain, uint(0))),
-            Utils.asBytes32(address(registrar))
+            Utils.asBytes32(address(this))
         );
 
-        // make the registrar the owner of the radicle.eth 721 token
+        // make this contract the owner of the radicle.eth 721 token
         address ethRegistrarAddr = ens.owner(Utils.namehash(["eth"]));
 
         // owner[tokenId]
@@ -240,17 +240,22 @@ contract RegistrarRPCTests is DSTest {
         hevm.store(
             ethRegistrarAddr,
             0x7906724a382e1baec969d07da2f219928e717131ddfd68dbe3d678f62fa3065b,
-            Utils.asBytes32(address(registrar))
+            Utils.asBytes32(address(this))
         );
 
-        // ownedTokensCount[address(registrar)]
+        // ownedTokensCount[address(this)]
         // TODO: make this less inscrutible
         hevm.store(
             ethRegistrarAddr,
-            0x27a5c9c1f678324d928c72a6ff8a66d3c79aa98b4c10804760d4542336658cc7,
+            bytes32(uint(99769381792979770997497849739242275106480790460331428765085642759382986339262)),
             bytes32(uint(1))
         );
 
+        // transfer ownership of the ENS record to the registrar
+        ens.setOwner(domain, address(registrar));
+
+        // transfer ownership of the 721 token to the registrar
+        IERC721(ethRegistrarAddr).transferFrom(address(this), address(registrar), tokenId);
     }
 
     // --- tests ---
