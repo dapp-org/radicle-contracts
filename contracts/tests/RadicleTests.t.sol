@@ -1,11 +1,10 @@
 pragma solidity ^0.7.5;
 pragma abicoder v2;
 
-
+import {Phase0}        from "../deploy/phase0.sol"; 
 import {RadicleToken}  from "../Governance/RadicleToken.sol";
 import {Governor}      from "../Governance/Governor.sol";
 import {Timelock}      from "../Governance/Timelock.sol";
-import {Treasury}      from "../Governance/Treasury.sol";
 import {VestingToken}  from "../Governance/VestingToken.sol";
 import {Registrar, Commitments} from "../Registrar.sol";
 
@@ -183,23 +182,6 @@ contract VestingTokenTests is DSTest, DSMath {
         owner.terminateVesting(vest);
 
         assertEq(vest.withdrawn(), add(withdrawn, withdrawable), "post-termination");
-    }
-}
-
-contract TreasuryTests is DSTest {
-    Hevm hevm = Hevm(HEVM_ADDRESS);
-    Treasury treasury;
-
-    function setUp() public {
-        treasury = new Treasury(address(this));
-    }
-
-    function test_initial() public {
-        assertEq(treasury.admin(), address(this));
-        address(treasury).transfer(100 ether);
-        assertEq(address(treasury).balance, 100 ether);
-        treasury.withdraw(address(2), 10 ether);
-        assertEq(address(treasury).balance, 90 ether);
     }
 }
 
@@ -406,18 +388,18 @@ contract GovernanceTest is DSTest {
     Hevm hevm = Hevm(HEVM_ADDRESS);
 
     function setUp() public {
-        rad = new RadicleToken(address(this));
+        Phase0 phase0 = new Phase0( address(this)
+                                  , 2 days
+                                  , address(this)
+                                  , ENS(address(this))
+                                  , "namehash"
+                                  , "label"
+                                  );
 
-        // manually create the rlp encoding of [sender,nonce], with length prefix.
-        // `192+len(sender)+len(nonce):len(sender):sender:128+len(nonce):nonce`
-        // no length prefix needed for nonce < 128
-        uint8 nonce = 3;  // predicted nonce of gov address
-        address govAddr =
-            address(bytes20(keccak256(
-                abi.encodePacked(hex"d694", address(this), nonce)) << 96));
+        rad      = phase0.token();
+        timelock = phase0.timelock();
+        gov      = phase0.governor();
 
-        timelock = new Timelock(govAddr, 2 days);
-        gov = new Governor(address(timelock), address(rad), address(this));
         usr = new RadUser(rad, gov);
         ali = new RadUser(rad, gov);
         bob = new RadUser(rad, gov);
@@ -427,6 +409,19 @@ contract GovernanceTest is DSTest {
         rad.transfer(address(bob), 500_001 ether);
         // quorum is 4%
         rad.transfer(address(cal), 5_000_000 ether);
+    }
+
+    function test_deploy() public {
+        uint gas_before = gasleft();
+        Phase0 phase0 = new Phase0( address(this)
+                                  , 2 days
+                                  , address(this)
+                                  , ENS(address(this))
+                                  , "namehash"
+                                  , "label"
+                                  );
+        uint gas_after = gasleft();
+        log_named_uint("deployment gas", gas_before - gas_after);
     }
 
     function test_radAddress() public {
