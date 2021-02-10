@@ -1,7 +1,7 @@
 pragma solidity ^0.7.5;
 pragma abicoder v2;
 
-import {Phase0}        from "../deploy/phase0.sol"; 
+import {Phase0}        from "../deploy/phase0.sol";
 import {RadicleToken}  from "../Governance/RadicleToken.sol";
 import {Governor}      from "../Governance/Governor.sol";
 import {Timelock}      from "../Governance/Timelock.sol";
@@ -19,6 +19,8 @@ interface Hevm {
     function warp(uint256) external;
     function roll(uint256) external;
     function store(address,bytes32,bytes32) external;
+    function sign(uint,bytes32) external returns (uint8,bytes32,bytes32);
+    function addr(uint) external returns (address);
 }
 
 contract VestingUser {
@@ -261,7 +263,6 @@ contract RegistrarRPCTests is DSTest {
         assertEq(ens.resolver(node), ens.resolver(Utils.namehash(["radicle", "eth"])));
     }
 
-
     // BUG: names transfered to the zero address can never be reregistered
     function test_reregistration(string memory name) public {
         if (bytes(name).length == 0) return;
@@ -349,6 +350,52 @@ contract RegistrarRPCTests is DSTest {
 
         registerWith(registrar, name);
         registerWith(registrar, name);
+    }
+
+    // unfortunately we need something like `hevm.callFrom` to test this properly
+    // this test is really just testing the scenario where the call is frontrun by an attacker
+    // we are still able to validate that:
+    // - the permit is correct
+    // - the attacker still pays
+    function test_commit_with_permit(uint sk, string memory name, uint salt) public {
+        if (!registrar.valid(name)) return;
+        if (sk == 0) return;
+
+        address owner = hevm.addr(sk);
+        uint preBal = rad.balanceOf(address(this));
+        uint preSupply = rad.totalSupply();
+        rad.approve(address(registrar), registrar.registrationFeeRad());
+
+        // sign the `permit` message
+        uint value = registrar.registrationFeeRad();
+        uint deadline = type(uint).max;
+        bytes32 structHash = keccak256(abi.encode(
+            rad.PERMIT_TYPEHASH(), owner, address(registrar), value, rad.nonces(owner), deadline
+        ));
+        bytes32 digest = keccak256(abi.encodePacked("\x19\x01", rad.DOMAIN_SEPARATOR(), structHash));
+        (uint8 v, bytes32 r, bytes32 s) = hevm.sign(sk, digest);
+
+        // generate the name commitment
+        bytes32 commitment = keccak256(abi.encodePacked(name, owner, salt));
+
+        // commit to the name using permit
+        registrar.commitWithPermit(commitment, owner, value, deadline, v, r, s);
+
+        assertEq(
+            preBal - rad.balanceOf(address(this)), registrar.registrationFeeRad(),
+            "frontrunner had to pay"
+        );
+        assertEq(rad.allowance(owner, address(registrar)), registrar.registrationFeeRad(),
+            "owner approved registrar for registrationFeeRad"
+        );
+        assertEq(
+            preSupply - rad.totalSupply(), registrar.registrationFeeRad(),
+            "rad totalSupply has decreased by registrationFeeRad rad"
+        );
+        assertEq(
+            registrar.commitments().commited(commitment), block.number,
+            "name was commited to"
+        );
     }
 
     // Utils.nameshash does the right thing for radicle.eth subdomains
@@ -621,7 +668,7 @@ contract GovernanceTest is DSTest {
     /*                                                    "This proposal migrates the radicle.eth domain and token to a new Registrar."); */
     /*     assertEq0(encoded, hex"da95691a00000000000000000000000000000000000000000000000000000000000000a000000000000000000000000000000000000000000000000000000000000000e00000000000000000000000000000000000000000000000000000000000000120000000000000000000000000000000000000000000000000000000000000018000000000000000000000000000000000000000000000000000000000000001e00000000000000000000000000000000000000000000000000000000000000001000000000000000000000000fcbcd8c32305228f205c841c03f59d2491f92cb400000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000000000000000200000000000000000000000000000000000000000000000000000000000000017736574446f6d61696e4f776e6572286164647265737329000000000000000000000000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000000000000000200000000000000000000000000000000000000000000000000000000000000020000000000000000000000000ecedfd8ba8ae39a6bd346fe9e5e0abea687fff31000000000000000000000000000000000000000000000000000000000000004b546869732070726f706f73616c206d69677261746573207468652072616469636c652e65746820646f6d61696e20616e6420746f6b656e20746f2061206e6577205265676973747261722e000000000000000000000000000000000000000000"); */
     /* } */
-    
+
     /* function testAbiEncode2() public { */
     /*     string[]  memory sigs    = new string[](1); */
     /*     sigs[0] = "setDomainOwner(address)"; */
@@ -630,7 +677,7 @@ contract GovernanceTest is DSTest {
     /*                                                    "This proposal migrates the radicle.eth domain and token to a new Registrar."); */
     /*     assertEq0(encoded, hex"07ac501f000000000000000000000000000000000000000000000000000000000000004000000000000000000000000000000000000000000000000000000000000000a0000000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000000000000000200000000000000000000000000000000000000000000000000000000000000017736574446f6d61696e4f776e6572286164647265737329000000000000000000000000000000000000000000000000000000000000000000000000000000004b546869732070726f706f73616c206d69677261746573207468652072616469636c652e65746820646f6d61696e20616e6420746f6b656e20746f2061206e6577205265676973747261722e000000000000000000000000000000000000000000"); */
     /* } */
-    
+
     /* function testAbiEncode3() public { */
     /*     string[]  memory sigs    = new string[](1); */
     /*     sigs[0] = "setDomainOwner(address)"; */
