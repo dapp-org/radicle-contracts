@@ -135,42 +135,46 @@ contract Registrar {
     }
 
     /// Commit to a future name and submit permit in the same transaction
-    function commitWithPermit(bytes32 commitment, address owner, uint256 value,
-                              uint256 deadline, uint8 v, bytes32 r, bytes32 s) external {
+    function commitWithPermit(
+        bytes32 commitment, address owner, uint256 value,
+        uint256 deadline, uint8 v, bytes32 r, bytes32 s
+    ) external {
         rad.permit(owner, address(this), value, deadline, v, r, s);
         _commit(msg.sender, commitment);
     }
 
     /// Commit to a future name with a 712-signed message
-    function commitBySig(bytes32 commitment, uint256 nonce, uint256 expiry, uint256 submissionFee, uint8 v, bytes32 r, bytes32 s) public {
+    function commitBySig(
+        bytes32 commitment, address owner, uint256 submissionFee,
+        uint256 deadline, uint8 v, bytes32 r, bytes32 s
+    ) public {
         bytes32 domainSeparator =
             keccak256(
                 abi.encode(DOMAIN_TYPEHASH, keccak256(bytes(NAME)), getChainId(), address(this))
             );
-        bytes32 structHash = keccak256(abi.encode(COMMIT_TYPEHASH, commitment, nonce, expiry, submissionFee));
+        bytes32 structHash =
+            keccak256(
+                abi.encode(COMMIT_TYPEHASH, commitment, nonces[owner]++, deadline, submissionFee)
+            );
         bytes32 digest = keccak256(abi.encodePacked("\x19\x01", domainSeparator, structHash));
         address signatory = ecrecover(digest, v, r, s);
+
         require(signatory != address(0), "Registrar::commitBySig: invalid signature");
-        require(nonce == nonces[signatory]++, "Registrar::commitBySig: invalid nonce");
-        require(block.timestamp <= expiry, "Registrar::commitBySig: signature expired");
+        require(signatory == owner, "Registrar::commitBySig: invalid signature");
+        require(block.timestamp <= deadline, "Registrar::commitBySig: signature expired");
+
         rad.transferFrom(signatory, msg.sender, submissionFee);
         _commit(signatory, commitment);
     }
 
     /// Commit to a future name with a 712-signed message and submit permit in the same transaction
-    function commitBySigWithPermit(bytes32 commitment, uint256 nonce, uint256 expiry, uint256 submissionFee, uint8 v, bytes32 r, bytes32 s,
-                                   address owner, uint256 value, uint256 deadline, uint8 permit_v, bytes32 permit_r, bytes32 permit_s) public {
-        rad.permit(owner, address(this), value, deadline, permit_v, permit_r, permit_s);
-        commitBySig(commitment, nonce, expiry, submissionFee, v, r, s);
-    }
-
-    function _commit(address payer, bytes32 commitment) internal {
-        require(commitments.commited(commitment) == 0, "Registrar::commit: already commited");
-
-        rad.burnFrom(payer, registrationFeeRad);
-        commitments.commit(commitment);
-
-        emit CommitmentMade(commitment, block.number);
+    function commitBySigWithPermit(
+        bytes32 commitment, address owner, uint256 permitVal, uint256 submissionFee, uint256 deadline,
+        uint8 commit_v, bytes32 commit_r, bytes32 commit_s,
+        uint8 permit_v, bytes32 permit_r, bytes32 permit_s
+   ) external {
+        rad.permit(owner, address(this), permitVal, deadline, permit_v, permit_r, permit_s);
+        commitBySig(commitment, owner, submissionFee, deadline, commit_v, commit_r, commit_s);
     }
 
     /// Register a subdomain
@@ -250,12 +254,18 @@ contract Registrar {
         emit AdminChanged(newAdmin);
     }
 
-    function getChainId() internal pure returns (uint256) {
-        uint256 chainId;
-        // solhint-disable no-inline-assembly
-        assembly {
-            chainId := chainid()
-        }
-        return chainId;
+    // --- INTERNAL METHODS ---
+
+    function _commit(address payer, bytes32 commitment) internal {
+        require(commitments.commited(commitment) == 0, "Registrar::commit: already commited");
+
+        rad.burnFrom(payer, registrationFeeRad);
+        commitments.commit(commitment);
+
+        emit CommitmentMade(commitment, block.number);
+    }
+
+    function getChainId() internal pure returns (uint256 chainId) {
+        assembly { chainId := chainid() }
     }
 }
