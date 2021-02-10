@@ -115,9 +115,9 @@ contract Registrar {
         ENS _ens,
         RadicleToken _rad,
         address _admin,
+        uint _minCommitmentAge,
         bytes32 _radNode,
         uint _tokenId
-        uint _minCommitmentAge
     ) {
         ens = _ens;
         rad = _rad;
@@ -239,7 +239,7 @@ contract Registrar {
     }
 
     /// Set a new registration fee
-    function setRegistrationRadFee(uint256 amt) public adminOnly {
+    function setRadRegistrationFee(uint256 amt) public adminOnly {
         registrationFeeRad = amt;
         emit RegistrationRadFeeChanged(amt);
     }

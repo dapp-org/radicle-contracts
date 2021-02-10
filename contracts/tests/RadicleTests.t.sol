@@ -192,6 +192,7 @@ contract RegistrarRPCTests is DSTest {
     bytes32 domain;
     uint tokenId;
     Hevm hevm = Hevm(HEVM_ADDRESS);
+    Governor gov;
 
     function setUp() public {
         domain = Utils.namehash(["radicle", "eth"]);
@@ -206,6 +207,7 @@ contract RegistrarRPCTests is DSTest {
                                     );
         registrar = phase0.registrar();
         rad = phase0.token();
+        gov = phase0.governor();
         log_named_address("Registrar", address(registrar));
 
         // make the registrar the owner of the radicle.eth domain
@@ -279,10 +281,8 @@ contract RegistrarRPCTests is DSTest {
     // "radicle.eth" domain to a new registrar
     // TODO: the Timelock is the admin of the Registrar,
     // so we will need to make a proposal to perform this transition.
-    function test_register_with_new_owner(string memory name) public {
-        if (bytes(name).length == 0) return;
-        if (bytes(name).length > 32) return;
-
+    function test_register_with_new_owner() public {
+        string memory name = "mrchico";
         Registrar registrar2 = new Registrar(
             ens,
             rad,
@@ -291,7 +291,52 @@ contract RegistrarRPCTests is DSTest {
             domain,
             tokenId
         );
-        registrar.setDomainOwner(address(registrar2));
+        log_named_address("registrar2", address(registrar2));
+        // This proposal was generated with `radgov propose newRegistrar`!
+        // where newRegistrar is:
+        //
+        // This proposal migrates the radicle.eth domain and token
+        // to a new Registrar.
+        //
+        // ## PROPOSAL ##
+        //
+        // ```
+        // 0xFCBcd8C32305228F205c841c03f59D2491f92Cb4 0 "setDomainOwner(address)" 0xEcEDFd8BA8ae39a6Bd346Fe9E5e0aBeA687fFF31
+        // ```
+        (bool success, bytes memory retdata) = address(gov).call(hex"da95691a00000000000000000000000000000000000000000000000000000000000000a000000000000000000000000000000000000000000000000000000000000000e00000000000000000000000000000000000000000000000000000000000000120000000000000000000000000000000000000000000000000000000000000018000000000000000000000000000000000000000000000000000000000000001e00000000000000000000000000000000000000000000000000000000000000001000000000000000000000000fcbcd8c32305228f205c841c03f59d2491f92cb400000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000000000000000200000000000000000000000000000000000000000000000000000000000000017736574446f6d61696e4f776e6572286164647265737329000000000000000000000000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000000000000000200000000000000000000000000000000000000000000000000000000000000020000000000000000000000000ecedfd8ba8ae39a6bd346fe9e5e0abea687fff31000000000000000000000000000000000000000000000000000000000000004b546869732070726f706f73616c206d69677261746573207468652072616469636c652e65746820646f6d61696e20616e6420746f6b656e20746f2061206e6577205265676973747261722e000000000000000000000000000000000000000000");
+        assertTrue(success);
+        uint id = abi.decode(retdata, (uint));
+        assertEq(id, 1);
+        (address[] memory targets, uint256[] memory values, string[] memory signatures, bytes[] memory calldatas) = gov.getActions(1);
+        assertEq(targets[0], address(registrar));
+        assertEq(values[0], 0);
+        assertEq(signatures[0], "setDomainOwner(address)");
+        assertEq0(calldatas[0], abi.encode(address(registrar2)));
+
+        // advance the time and vote the proposal through
+        hevm.roll(block.number + gov.votingDelay() + 1);
+        assertEq(uint(gov.state(id)), 1, "proposal is active");
+
+        // votes cast must have been checkpointed by delegation, and
+        // exceed the quorum and votes against
+        gov.castVote(id, true);
+        hevm.roll(block.number + gov.votingPeriod());
+        assertEq(uint(gov.state(id)), 4, "proposal is successful");
+
+        // queueing succeeds unless already queued
+        // (N.B. cannot queue multiple calls to same signature as-is)
+        gov.queue(id);
+        assertEq(uint(gov.state(id)), 5, "proposal is queued");
+
+        // can only execute following time delay
+        hevm.warp(block.timestamp + 2 days);
+        gov.execute(id);
+        assertEq(uint(gov.state(id)), 7, "proposal is executed");
+
+        // the new registrar is now the owner of the domain
+        assertEq(ens.owner(domain), address(registrar2));
+
+        // and so we can register with it
         registerWith(registrar2, name);
 
         assertEq(ens.owner(Utils.namehash([name, "radicle", "eth"])), address(this));
@@ -558,6 +603,42 @@ contract GovernanceTest is DSTest {
         assertEq(uint(gov.state(id)), 7, "proposal is executed");
         assertEq(x, 1, "x is modified");
     }
+
+    /* function testAbiEncode() public { */
+    /*     address[] memory targets = new address[](1); */
+    /*     uint256[] memory values  = new uint256[](1); */
+    /*     string[]  memory sigs    = new string[](1); */
+    /*     bytes[]   memory datas   = new bytes[](1); */
+    /*     targets[0] = 0xFCBcd8C32305228F205c841c03f59D2491f92Cb4; */
+    /*     values[0] = 0; */
+    /*     sigs[0] = "setDomainOwner(address)"; */
+    /*     datas[0] = abi.encode(address(0xEcEDFd8BA8ae39a6Bd346Fe9E5e0aBeA687fFF31)); */
+    /*     bytes memory encoded = abi.encodeWithSignature("propose(address[],uint256[],string[],bytes[],string)", */
+    /*                                                    targets, */
+    /*                                                    values, */
+    /*                                                    sigs, */
+    /*                                                    datas, */
+    /*                                                    "This proposal migrates the radicle.eth domain and token to a new Registrar."); */
+    /*     assertEq0(encoded, hex"da95691a00000000000000000000000000000000000000000000000000000000000000a000000000000000000000000000000000000000000000000000000000000000e00000000000000000000000000000000000000000000000000000000000000120000000000000000000000000000000000000000000000000000000000000018000000000000000000000000000000000000000000000000000000000000001e00000000000000000000000000000000000000000000000000000000000000001000000000000000000000000fcbcd8c32305228f205c841c03f59d2491f92cb400000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000000000000000200000000000000000000000000000000000000000000000000000000000000017736574446f6d61696e4f776e6572286164647265737329000000000000000000000000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000000000000000200000000000000000000000000000000000000000000000000000000000000020000000000000000000000000ecedfd8ba8ae39a6bd346fe9e5e0abea687fff31000000000000000000000000000000000000000000000000000000000000004b546869732070726f706f73616c206d69677261746573207468652072616469636c652e65746820646f6d61696e20616e6420746f6b656e20746f2061206e6577205265676973747261722e000000000000000000000000000000000000000000"); */
+    /* } */
+    
+    /* function testAbiEncode2() public { */
+    /*     string[]  memory sigs    = new string[](1); */
+    /*     sigs[0] = "setDomainOwner(address)"; */
+    /*     bytes memory encoded = abi.encodeWithSignature("f(string[],string)", */
+    /*                                                    sigs, */
+    /*                                                    "This proposal migrates the radicle.eth domain and token to a new Registrar."); */
+    /*     assertEq0(encoded, hex"07ac501f000000000000000000000000000000000000000000000000000000000000004000000000000000000000000000000000000000000000000000000000000000a0000000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000000000000000200000000000000000000000000000000000000000000000000000000000000017736574446f6d61696e4f776e6572286164647265737329000000000000000000000000000000000000000000000000000000000000000000000000000000004b546869732070726f706f73616c206d69677261746573207468652072616469636c652e65746820646f6d61696e20616e6420746f6b656e20746f2061206e6577205265676973747261722e000000000000000000000000000000000000000000"); */
+    /* } */
+    
+    /* function testAbiEncode3() public { */
+    /*     string[]  memory sigs    = new string[](1); */
+    /*     sigs[0] = "setDomainOwner(address)"; */
+    /*     bytes memory encoded = abi.encodeWithSignature("f(string[])", */
+    /*                                                    sigs); */
+    /*     assertEq0(encoded, hex"e9cc87800000000000000000000000000000000000000000000000000000000000000060000000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000000000000000400000000000000000000000000000000000000000000000000000000000000017736574446f6d61696e4f776e6572286164647265737329000000000000000000"); */
+    /* } */
+
 }
 
 library Utils {
